@@ -331,6 +331,7 @@ export class Room {
     this.turnNumber++;
     this.wind = driftWind(this.wind, () => Math.random(), this.config.windMax);
     this.shotSeed = rand32();
+    this.seats[seat]!.credits += this.config.turnAllowance; // per-turn stipend
     this.broadcast({
       type: 'turn:begin',
       seat,
@@ -338,6 +339,7 @@ export class Room {
       wind: this.wind,
       shotSeed: this.shotSeed,
     });
+    this.broadcastShop(); // carries the refreshed credits to both clients
   }
 
   private onAim(seat: Seat, angleDeci: number, power: number): void {

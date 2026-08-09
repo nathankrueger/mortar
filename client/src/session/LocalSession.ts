@@ -183,6 +183,7 @@ export class LocalSession implements GameSession {
     const windRng = mulberry32(deriveSeed(this.matchSeed, WIND_SALT + this.turnNumber));
     this.wind = driftWind(this.wind, windRng, this.config.windMax);
     const seat = this.turnSeat;
+    this.credits[seat] += this.config.turnAllowance; // per-turn stipend
     if (!this.isSandbox && !hasAmmo(this.inventories[seat], this.weapons[seat])) {
       this.weapons[seat] = 'mortar';
     }

@@ -15,7 +15,7 @@ describe('shotEarnings', () => {
   it('pays per HP plus direct-hit bonuses', () => {
     expect(shotEarnings(0, 0)).toBe(0);
     expect(shotEarnings(44, 1)).toBe(44 * CREDITS_PER_HP + DIRECT_HIT_BONUS);
-    expect(shotEarnings(30, 0)).toBe(540);
+    expect(shotEarnings(30, 0)).toBe(30 * 36);
   });
 });
 

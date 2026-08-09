@@ -30,8 +30,9 @@ same Wi-Fi to join. For development, `npm run dev` runs the Vite client on
 
 Each player starts with **10,000 credits** and a pre-match loadout shop. The
 basic Mortar is free and unlimited; everything else is bought — before the
-match or mid-battle with the **Shop** button on your turn. Dealing damage pays
-**18 cr per HP** plus a **150 cr direct-hit bonus**. Wind changes every turn.
+match or mid-battle with the **Shop** button on your turn. Every turn grants a
+**1,000 cr allowance**, and dealing damage pays **36 cr per HP** plus a
+**300 cr direct-hit bonus**. Wind drifts a little each turn.
 
 | Desktop | Mobile |
 |---|---|

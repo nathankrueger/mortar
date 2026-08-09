@@ -1,8 +1,8 @@
 import { WEAPONS, type WeaponId } from './weapons';
 
 // Credits: earned by hurting your opponent, spent in the shop.
-export const CREDITS_PER_HP = 18;
-export const DIRECT_HIT_BONUS = 150;
+export const CREDITS_PER_HP = 36;
+export const DIRECT_HIT_BONUS = 300;
 
 export type Inventory = Partial<Record<WeaponId, number>>;
 

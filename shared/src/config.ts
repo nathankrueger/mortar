@@ -7,6 +7,8 @@ import { triangular, type Rng } from './rng';
 export const MatchConfigSchema = z.object({
   startingCredits: z.number().int().min(0).max(1_000_000).default(10_000),
   startingHp: z.number().int().min(25).max(500).default(100),
+  /** Credits granted at the start of every turn, win or lose. */
+  turnAllowance: z.number().int().min(0).max(100_000).default(1_000),
   /** Seconds per turn (aiming + shopping). 0 disables the timer. */
   turnSeconds: z.number().int().min(0).max(600).default(60),
   windMax: z.number().int().min(0).max(300).default(WIND_MAX_DEFAULT),

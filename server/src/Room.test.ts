@@ -66,6 +66,28 @@ describe('Room', () => {
     expect(b.last('turn:begin')).toEqual(turn);
   });
 
+  it('grants the per-turn allowance to whoever is up', () => {
+    const { room, a, b } = setupLobby();
+    startMatch(room, a, b);
+    const first = a.last('turn:begin')!.seat;
+    let shop = a.last('shop:update')!;
+    expect(shop.credits[first]).toBe(10_000 + 1_000);
+    expect(shop.credits[1 - first]).toBe(10_000);
+
+    // A harmless shot passes the turn; the other seat collects next.
+    room.handleMsg(first, {
+      type: 'shot:fire',
+      weapon: 'mortar',
+      angleDeci: 450,
+      power: 30,
+      events: [] as never,
+      ticks: 10,
+    });
+    vi.advanceTimersByTime(3000);
+    shop = a.last('shop:update')!;
+    expect(shop.credits[1 - first]).toBe(10_000 + 1_000);
+  });
+
   it('validates purchases server-side', () => {
     const { room, a, b } = setupLobby();
     room.handleMsg(0, { type: 'lobby:ready', ready: true });
