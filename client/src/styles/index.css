@@ -73,6 +73,13 @@ body {
   animation: turn-banner 2s ease-out forwards;
 }
 
+/* Short screens: drop the flavor text so the shop grid shows more weapons. */
+@media (max-height: 500px) {
+  .shop-blurb {
+    display: none;
+  }
+}
+
 /* Scrollable lists fade out at their clipped edges instead of cutting hard. */
 .scroll-fade {
   -webkit-mask-image: linear-gradient(

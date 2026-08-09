@@ -10,7 +10,6 @@ import {
 } from '@mortar/shared';
 import { WEAPONS, type WeaponId } from '@mortar/shared';
 import { Application, Container, Sprite, Texture } from 'pixi.js';
-import { IS_COARSE_POINTER } from '../app/platform';
 import { sfx } from '../audio/sfx';
 import { Camera, type InterestBox } from './camera';
 import { ShotPlayback, type PlaybackDelegate } from './playback';
@@ -56,7 +55,7 @@ export interface ShotHooks {
 export class GameApp {
   readonly app = new Application();
   readonly worldRoot = new Container();
-  readonly camera = new Camera(this.worldRoot, IS_COARSE_POINTER);
+  readonly camera = new Camera(this.worldRoot);
   readonly sky = new SkyLayer();
   readonly clouds = new CloudLayer();
   readonly shake = new ScreenShake();
@@ -303,9 +302,9 @@ export class GameApp {
     }
   }
 
-  /** On phones the camera pans to the shells in flight; desktop stays wide. */
+  /** Shells in flight — the camera pans vertically to keep them in frame. */
   private followInterest(): InterestBox | null {
-    if (!IS_COARSE_POINTER || !this.playback) return null;
+    if (!this.playback) return null;
     const pts = [...this.projectiles.positions(), ...this.fx.hotPoints()];
     if (pts.length === 0) return null;
     let x0 = Infinity;

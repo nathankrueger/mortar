@@ -3,7 +3,11 @@ import type { Inventory } from '../../app/store';
 import { Button } from '../kit/Button';
 import { GlassPanel } from '../kit/GlassPanel';
 
-/** Weapon storefront used for the pre-match loadout and the in-turn shop. */
+/**
+ * Weapon storefront for the pre-match loadout and the in-turn shop.
+ * Compact by design: the confirm button lives in the header row and cards
+ * shrink (blurbs hide) on short screens so the grid gets all the space.
+ */
 export function ShopPanel({
   title,
   credits,
@@ -22,14 +26,21 @@ export function ShopPanel({
   accentClass?: string;
 }) {
   return (
-    <GlassPanel className="pointer-events-auto flex max-h-[88dvh] w-[min(94vw,780px)] flex-col gap-4 p-6 max-sm:landscape:gap-2 max-sm:landscape:p-3">
-      <div className="flex items-baseline justify-between gap-4">
-        <h2 className={`text-xl font-bold tracking-tight ${accentClass ?? 'text-white'}`}>{title}</h2>
-        <span className="font-mono text-lg font-bold text-emerald-300">
-          {credits.toLocaleString()} cr
-        </span>
+    <GlassPanel className="pointer-events-auto flex max-h-[92dvh] w-[min(94vw,820px)] flex-col gap-2 p-4 max-sm:landscape:p-3">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className={`truncate text-base font-bold tracking-tight sm:text-lg ${accentClass ?? 'text-white'}`}>
+          {title}
+        </h2>
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="font-mono text-sm font-bold text-emerald-300 sm:text-base">
+            {credits.toLocaleString()} cr
+          </span>
+          <Button onClick={onDone} className="px-5 py-1.5 text-sm">
+            {doneLabel}
+          </Button>
+        </div>
       </div>
-      <div className="scroll-fade grid flex-1 grid-cols-2 gap-2 overflow-y-auto py-2 pr-1 sm:grid-cols-3 lg:grid-cols-4">
+      <div className="scroll-fade grid flex-1 grid-cols-2 gap-1.5 overflow-y-auto py-2 pr-1 sm:grid-cols-3 md:grid-cols-4">
         {WEAPON_ORDER.filter((id) => WEAPONS[id].price !== null).map((id) => {
           const spec = WEAPONS[id];
           const owned = inventory[id] ?? 0;
@@ -37,32 +48,34 @@ export function ShopPanel({
           return (
             <div
               key={id}
-              className="flex flex-col justify-between gap-2 rounded-2xl border border-white/10 bg-black/25 p-3"
+              title={spec.blurb}
+              className="flex flex-col justify-between gap-1.5 rounded-xl border border-white/10 bg-black/25 p-2.5"
             >
               <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-white/90">{spec.name}</span>
+                <div className="flex items-center justify-between gap-1">
+                  <span className="truncate text-xs font-bold text-white/90 sm:text-sm">
+                    {spec.name}
+                  </span>
                   {owned > 0 && (
-                    <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs font-bold text-white/85">
+                    <span className="shrink-0 rounded-full bg-white/15 px-1.5 py-0.5 text-[10px] font-bold text-white/85">
                       ×{owned}
                     </span>
                   )}
                 </div>
-                <p className="mt-1 text-xs leading-snug text-white/50">{spec.blurb}</p>
+                <p className="shop-blurb mt-0.5 text-[11px] leading-snug text-white/50">
+                  {spec.blurb}
+                </p>
               </div>
               <button
                 disabled={!affordable}
                 onClick={() => onBuy(id)}
-                className="cursor-pointer rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-ink transition-all hover:bg-white active:scale-95 disabled:cursor-default disabled:bg-white/20 disabled:text-white/40"
+                className="cursor-pointer rounded-full bg-white/90 px-2 py-1 text-[11px] font-bold text-ink transition-all hover:bg-white active:scale-95 disabled:cursor-default disabled:bg-white/20 disabled:text-white/40"
               >
                 {spec.price!.toLocaleString()} cr
               </button>
             </div>
           );
         })}
-      </div>
-      <div className="flex justify-end">
-        <Button onClick={onDone}>{doneLabel}</Button>
       </div>
     </GlassPanel>
   );
