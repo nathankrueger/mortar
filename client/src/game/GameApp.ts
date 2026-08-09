@@ -175,6 +175,9 @@ export class GameApp {
 
   /** Create or reposition tank views to match sim state. */
   setTanks(states: TankSnapshot[]): void {
+    if (states.length > 0) {
+      this.camera.setFloorY(Math.max(...states.map((s) => s.y)));
+    }
     for (const s of states) {
       let view = this.tanks.get(s.seat);
       if (!view) {

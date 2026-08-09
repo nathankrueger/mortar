@@ -11,6 +11,13 @@ export interface InterestBox {
 const SMOOTHING = 5.5; // spring-ish exponential smoothing rate
 /** Keep tracked shells at least this far below the top edge (wu). */
 const TRACK_MARGIN = 90;
+/**
+ * When the viewport can't show the full world height (phone landscape), trade
+ * up to this much deep dirt for sky so shell arcs fit without camera moves.
+ */
+const SKY_BIAS_MAX = 200;
+/** Never crop closer than this below the lowest tank (wu). */
+const FLOOR_PAD = 80;
 
 /**
  * One framing, no zoom, ever: fit the battlefield width, pin the floor to the
@@ -29,6 +36,7 @@ export class Camera {
   private scale = 1;
   private cx = WORLD_W / 2;
   private cy = WORLD_H / 2;
+  private floorY = WORLD_H;
   private snapped = false;
 
   constructor(private readonly root: Container) {}
@@ -39,6 +47,11 @@ export class Camera {
     this.vh = h;
     this.fitScale = w / WORLD_W;
     this.snapped = false; // re-snap to the new framing
+  }
+
+  /** Lowest tank y — the sky bias never crops within FLOOR_PAD of it. */
+  setFloorY(y: number): void {
+    this.floorY = y;
   }
 
   /** World x of the screen's left edge — used for parallax layers. */
@@ -53,7 +66,14 @@ export class Camera {
   update(dtSec: number, interest: InterestBox | null): void {
     const tScale = this.fitScale;
     const span = this.vh / tScale;
-    const bottomCy = WORLD_H - span / 2;
+    // Sky bias: when height is cropped anyway, prefer cropping deep dirt so
+    // more of the shell arc fits (never within FLOOR_PAD of the lowest tank).
+    const missing = Math.max(0, WORLD_H - span);
+    const bias = Math.max(
+      0,
+      Math.min(missing, SKY_BIAS_MAX, WORLD_H - (this.floorY + FLOOR_PAD)),
+    );
+    const bottomCy = WORLD_H - bias - span / 2;
     const tcx = WORLD_W / 2;
     // Pan up only as far as needed to keep the highest shell in frame.
     const tcy = interest
