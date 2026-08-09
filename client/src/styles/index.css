@@ -1,0 +1,74 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  /* Accent palette: iOS-ish blue for seat 0, warm coral for seat 1. */
+  --color-p1: #4f9cf9;
+  --color-p1-deep: #2f6fd4;
+  --color-p2: #ff7a59;
+  --color-p2-deep: #d94f2f;
+  --color-ink: #0b1220;
+}
+
+html {
+  height: 100%;
+}
+
+/*
+ * iOS Safari: a fixed, inset-0 body is the only reliable full-viewport root —
+ * percentage heights lie when the landscape URL bar collapses/expands, and a
+ * static body rubber-band-scrolls the whole game. dvh tracks the real visual
+ * viewport where supported.
+ */
+body {
+  margin: 0;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  height: 100%;
+  width: 100%;
+  font-family: var(--font-sans);
+  color: white;
+  background: #0b1220;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+@supports (height: 100dvh) {
+  body {
+    height: 100dvh;
+  }
+}
+
+#root {
+  height: 100%;
+}
+
+@keyframes turn-banner {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.92);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -4px);
+  }
+}
+
+.turn-banner {
+  animation: turn-banner 2s ease-out forwards;
+}
