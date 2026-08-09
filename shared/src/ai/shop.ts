@@ -5,6 +5,7 @@ import { AI_PROFILES, type AiDifficulty } from './difficulty';
 // Purchase priority, strongest first. The AI walks the list greedily until
 // its budget fraction is spent.
 const HARD_PRIORITY: WeaponId[] = [
+  'megaMnw',
   'largeNuke',
   'medNuke',
   'mnw',
@@ -30,6 +31,7 @@ const EASY_PRIORITY: WeaponId[] = [
 /** Turn-order weapon preference (fire the best thing you own). Never the
  * Dirt Bomb — the AI has no notion of building defenses yet. */
 export const FIRE_PRIORITY: WeaponId[] = [
+  'megaMnw',
   'bigOne',
   'largeNuke',
   'medNuke',

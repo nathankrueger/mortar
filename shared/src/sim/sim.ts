@@ -169,7 +169,6 @@ export function resolveShot(ctx: ShotContext, params: ShotParams): ShotOutcome {
       tally,
     });
     settleTanks(ctx, events, tick);
-    if (p.mnwWeights) launchMnwFountain(p, x, y);
     if (p.airstrike) callAirstrike(p, x);
   };
 
@@ -258,16 +257,19 @@ export function resolveShot(ctx: ShotContext, params: ShotParams): ShotOutcome {
     events.push({ t: 'fizzle', id: p.id, x, y, tick });
   };
 
-  const launchMnwFountain = (parent: LiveProjectile, x: number, y: number): void => {
-    const k = 1 + weightedIndex(rng, parent.mnwWeights!);
-    const payloadSpec = weaponSpec(params.weapon); // full-strength warhead stats
+  /** MNW family: a mirv whose warhead count is a gamble. */
+  const doMnwSplit = (p: LiveProjectile): void => {
+    const split = p.split!;
+    const k = 1 + weightedIndex(rng, p.mnwWeights!);
+    events.push({ t: 'split', id: p.id, tick });
+    remove(p);
     for (let i = 0; i < k; i++) {
-      const vx = randRange(rng, 60, 260) * (chance(rng, 0.5) ? 1 : -1);
-      const vy = -randRange(rng, 280, 420);
-      spawn('nukelet', x, y - 6, vx, vy, {
-        blastR: payloadSpec.blastR,
-        dmg: payloadSpec.dmg,
-        tier: payloadSpec.tier,
+      const offset = (i - (k - 1) / 2) * split.spreadVx;
+      const jitter = randRange(rng, -split.jitterVx, split.jitterVx);
+      spawn('nukelet', p.x, p.y, p.vx + offset + jitter, p.vy, {
+        blastR: p.blastR,
+        dmg: p.dmg,
+        tier: p.tier,
         split: null,
         childBounce: null,
         bounce: null,
@@ -345,16 +347,17 @@ export function resolveShot(ctx: ShotContext, params: ShotParams): ShotOutcome {
   const dirLen = Math.sqrt(vx * vx + vy * vy) || 1;
   const cx = shooter.x + (vx / dirLen) * MUZZLE_LEN;
   const cy = shooter.y - TANK_H / 2 + (vy / dirLen) * MUZZLE_LEN;
-  const isMnw = spec.behavior === 'mnw';
+  const splitting =
+    spec.behavior === 'mirv' || spec.behavior === 'mirvBounce' || spec.behavior === 'mnw';
   spawn(params.weapon, cx, cy, vx, vy, {
-    // The MNW carrier itself only pops — its punch is the fountain it releases.
-    blastR: isMnw ? 36 : spec.blastR,
-    dmg: isMnw ? 16 : spec.dmg,
-    tier: isMnw ? 0 : spec.tier,
-    split: spec.behavior === 'mirv' || spec.behavior === 'mirvBounce' ? spec.split! : null,
+    // An MNW hitting before apex detonates as a single warhead of its class.
+    blastR: spec.blastR,
+    dmg: spec.dmg,
+    tier: spec.tier,
+    split: splitting ? spec.split! : null,
     childBounce: spec.behavior === 'mirvBounce' ? spec.bounce! : null,
     bounce: spec.behavior === 'bounce' ? spec.bounce! : null,
-    mnwWeights: isMnw ? spec.mnwWeights! : null,
+    mnwWeights: spec.behavior === 'mnw' ? spec.mnwWeights! : null,
     airstrike: spec.behavior === 'airstrike' ? spec.airstrike! : null,
     digRemaining: spec.behavior === 'digger' ? spec.dig!.depth : 0,
     isDirt: spec.behavior === 'dirt',
@@ -377,7 +380,8 @@ export function resolveShot(ctx: ShotContext, params: ShotParams): ShotOutcome {
 
       // Apex split: vertical velocity flips downward.
       if (p.split && p.age > 0.25 && prevVy < 0 && p.vy >= 0) {
-        doSplit(p);
+        if (p.mnwWeights) doMnwSplit(p);
+        else doSplit(p);
         continue;
       }
 

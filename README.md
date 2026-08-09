@@ -42,15 +42,16 @@ match or mid-battle with the **Shop** button on your turn. Every turn grants a
 | 1–9, 0, − select weapon | tap the weapon tray |
 | Esc opens the menu | ≡ button (top-left) |
 
-### Arsenal (16)
+### Arsenal (17)
 
 Mortar · Sniper Shell (tiny blast, brutal direct hits) · Large Mortar ·
 Dirt Bomb (builds a hill instead of a crater) · Roller (rolls downhill to the
 valley) · Bounce Bomb (3–6 hopping blasts, 18% dud finale) · Mirv (splits into
 5) · Digger (burrows deep, then detonates) · Small/Medium/Large Nuke ·
 Airstrike (six shells rain from above) · Multi Mirv (splits into 9) ·
-Mirv Bounce (5 hopping warheads) · MNW (gambles 1–5 small nukes) · The Big One
-(you'll know).
+Mirv Bounce (5 hopping warheads) · MNW (mirv gamble: splits high into 1–5
+small nukes) · The Big One (you'll know) · Mega MNW (the same gamble, large
+nukes).
 
 Terrain obeys gravity: dirt with nothing under it falls, crater lips slump
 inward, and a Dirt Bomb hill will bury (or elevate) whoever it lands on.

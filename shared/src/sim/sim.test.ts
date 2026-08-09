@@ -198,6 +198,29 @@ describe('weapon behaviors', () => {
     expect(dudRate).toBeLessThan(0.3);
   });
 
+  it('mnw hitting before apex detonates as a single small nuke', () => {
+    const heights = flatHeights();
+    for (let x = 700; x < 760; x++) heights[x] = 300; // wall by the muzzle
+    const out = fire(makeCtx({ heights }), { weapon: 'mnw', angleDeg: 10, power: 90 });
+    expect(ofType(out.events, 'split')).toHaveLength(0);
+    const explode = ofType(out.events, 'explode');
+    expect(explode).toHaveLength(1);
+    expect(explode[0].r).toBe(WEAPONS.mnw.blastR);
+  });
+
+  it('mega mnw splits into large-nuke warheads at apex', () => {
+    const out = fire(makeCtx({ tank1: [2350, FLAT_Y] }), {
+      weapon: 'megaMnw',
+      angleDeg: 60,
+      power: 60,
+    });
+    expect(ofType(out.events, 'split')).toHaveLength(1);
+    const nukelets = ofType(out.events, 'spawn').filter((s) => s.kind === 'nukelet');
+    expect(nukelets.length).toBeGreaterThanOrEqual(1);
+    expect(nukelets.length).toBeLessThanOrEqual(5);
+    for (const e of ofType(out.events, 'explode')) expect(e.r).toBe(WEAPONS.megaMnw.blastR);
+  });
+
   it('mnw launches 1..5 nukelets with the advertised distribution', () => {
     const counts: number[] = [];
     for (let seed = 0; seed < 300; seed++) {

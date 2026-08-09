@@ -18,7 +18,8 @@ export type WeaponId =
   | 'mnw'
   | 'medNuke'
   | 'largeNuke'
-  | 'bigOne';
+  | 'bigOne'
+  | 'megaMnw';
 
 export type WeaponBehavior =
   | 'shell'
@@ -223,13 +224,26 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
   mnw: {
     id: 'mnw',
     name: 'MNW',
-    blurb: 'Gamble: bursts into one to five small nukes.',
+    blurb: 'Mirv gamble: splits high into one to five small nukes.',
     price: 3800,
     behavior: 'mnw',
-    blastR: 95, // per launched warhead (small-nuke class)
+    blastR: 95, // per warhead (small-nuke class); also the pre-apex carrier
     dmg: 48,
     tier: 1,
     mnwWeights: [10, 20, 30, 25, 15],
+    split: { count: 5, spreadVx: 70, jitterVx: 15 },
+  },
+  megaMnw: {
+    id: 'megaMnw',
+    name: 'Mega MNW',
+    blurb: 'The MNW’s older sibling: up to five LARGE nukes.',
+    price: 16000,
+    behavior: 'mnw',
+    blastR: 180, // per warhead (large-nuke class)
+    dmg: 78,
+    tier: 3,
+    mnwWeights: [10, 20, 30, 25, 15],
+    split: { count: 5, spreadVx: 90, jitterVx: 18 },
   },
   bounceBomb: {
     id: 'bounceBomb',
@@ -289,6 +303,7 @@ export const WEAPON_ORDER: readonly WeaponId[] = [
   'medNuke',
   'largeNuke',
   'bigOne',
+  'megaMnw',
 ];
 
 export function weaponSpec(id: WeaponId): WeaponSpec {
