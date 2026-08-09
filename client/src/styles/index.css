@@ -72,3 +72,21 @@ body {
 .turn-banner {
   animation: turn-banner 2s ease-out forwards;
 }
+
+/* Scrollable lists fade out at their clipped edges instead of cutting hard. */
+.scroll-fade {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black 16px,
+    black calc(100% - 20px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black 16px,
+    black calc(100% - 20px),
+    transparent 100%
+  );
+}

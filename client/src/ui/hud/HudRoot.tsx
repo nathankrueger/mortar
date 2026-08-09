@@ -90,6 +90,11 @@ export function HudRoot({
         </div>
         <div className="mt-1 flex flex-col items-center gap-2">
           <WindPill wind={wind} />
+          {phase === 'resolving' && (
+            <div className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/50 backdrop-blur-xl">
+              {WEAPONS[weapon].name} away…
+            </div>
+          )}
         </div>
         <PlayerCard
           seat={1}
@@ -239,12 +244,6 @@ export function HudRoot({
         />
       )}
 
-      {/* Weapon flavor line while resolving */}
-      {phase === 'resolving' && (
-        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/50 backdrop-blur-xl">
-          {WEAPONS[weapon].name} away…
-        </div>
-      )}
     </div>
   );
 }

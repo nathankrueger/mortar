@@ -29,7 +29,7 @@ export function ShopPanel({
           {credits.toLocaleString()} cr
         </span>
       </div>
-      <div className="grid flex-1 grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3 lg:grid-cols-4">
+      <div className="scroll-fade grid flex-1 grid-cols-2 gap-2 overflow-y-auto py-2 pr-1 sm:grid-cols-3 lg:grid-cols-4">
         {WEAPON_ORDER.filter((id) => WEAPONS[id].price !== null).map((id) => {
           const spec = WEAPONS[id];
           const owned = inventory[id] ?? 0;

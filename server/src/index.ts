@@ -18,7 +18,22 @@ const clientDist = [
   path.resolve(here, '../../client/dist'),
   path.resolve(here, '../client/dist'),
 ].find((p) => existsSync(path.join(p, 'index.html')));
-const serveStatic = clientDist ? sirv(clientDist, { single: true }) : null;
+const serveStatic = clientDist
+  ? sirv(clientDist, {
+      single: true,
+      etag: true,
+      setHeaders(res, pathname) {
+        // Hashed assets are immortal; everything else (index.html, manifest,
+        // icons) must revalidate — iOS Safari otherwise serves stale builds
+        // from its heuristic cache for days.
+        if (pathname.startsWith('/assets/')) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        } else {
+          res.setHeader('Cache-Control', 'no-cache');
+        }
+      },
+    })
+  : null;
 
 const rooms = new RoomManager();
 

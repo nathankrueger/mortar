@@ -6,4 +6,5 @@ import './styles/index.css';
 
 audio.installUnlock();
 applySavedVolumes();
+console.info(`Mortar Mayhem build ${__BUILD_ID__}`);
 createRoot(document.getElementById('root')!).render(<App />);
