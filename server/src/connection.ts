@@ -142,6 +142,9 @@ export function startHeartbeat(getClients: () => Set<WebSocket>): void {
       }
       anyWs.isAlive = false;
       ws.ping();
+      // App-level heartbeat too: protocol pings never reach page JS, and
+      // clients need recent traffic to tell zombie sockets from idle ones.
+      if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ type: 'ping' }));
     }
   }, 10_000).unref();
 }

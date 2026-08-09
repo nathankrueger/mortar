@@ -114,9 +114,15 @@ export class Room {
     s.ws = null;
     this.touch();
     if (this.phase === 'lobby') {
-      // Seat frees up entirely in the lobby.
-      this.seats[seat] = null;
+      // Hold the seat (ready flag included) — a backgrounded phone drops its
+      // socket but usually comes back. Free it only after a grace window.
       this.broadcastPeers();
+      setTimeout(() => {
+        if (this.phase === 'lobby' && this.seats[seat] && this.seats[seat]!.ws === null) {
+          this.seats[seat] = null;
+          this.broadcastPeers();
+        }
+      }, 120_000);
       return;
     }
     this.broadcast({ type: 'room:peerConnection', seat, connected: false });
@@ -191,9 +197,18 @@ export class Room {
   }
 
   broadcastPeers(): void {
-    const peers = this.seats
-      .filter((s): s is SeatState => s !== null)
-      .map((s) => ({ nickname: s.nickname, connected: s.ws !== null, ready: s.lobbyReady }));
+    const peers = this.seats.flatMap((s, i) =>
+      s
+        ? [
+            {
+              seat: i as Seat,
+              nickname: s.nickname,
+              connected: s.ws !== null,
+              ready: s.lobbyReady,
+            },
+          ]
+        : [],
+    );
     this.broadcast({ type: 'room:peers', peers });
   }
 

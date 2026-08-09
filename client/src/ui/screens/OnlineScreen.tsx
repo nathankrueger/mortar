@@ -22,14 +22,25 @@ type Stage = 'form' | 'connecting' | 'lobby' | 'game';
 export type OnlineMode = 'create' | 'join' | 'rejoin';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Server heartbeats every 10s; silence beyond this means a zombie socket. */
+const STALE_MS = 35_000;
 
-/** Create/join/rejoin a room, wait in the lobby, then play over the wire. */
+/**
+ * Create/join/rejoin a room and play over the wire.
+ *
+ * Connection resilience, from first principles: sockets die silently when
+ * phones sleep, so no single event can be trusted. One recovery routine
+ * covers every in-room stage (lobby, game, end screen) and is triggered by
+ * socket close, tab wake (visibility/pageshow/focus), and a periodic
+ * watchdog that also detects zombie sockets via heartbeat staleness. All
+ * lobby truth (ready flags, membership) lives on the server and is re-derived
+ * after every reconnect — the UI never owns it.
+ */
 export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialCode?: string }) {
   const [stage, setStage] = useState<Stage>('form');
   const [nickname, setNickname] = useState(() => savedNickname());
   const [codeDraft, setCodeDraft] = useState(initialCode ?? '');
   const [error, setError] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
 
@@ -37,13 +48,20 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
   const sessionRef = useRef<NetworkSession | null>(null);
   const pendingRef = useRef<ServerMsg[]>([]);
   const stageRef = useRef<Stage>('form');
+  const nickRef = useRef('');
+  const recoveringRef = useRef(false);
+  const recoverRef = useRef<() => void>(() => {});
   stageRef.current = stage;
 
   const matchActive = useAppStore((s) => s.matchActive);
   const roomCode = useAppStore((s) => s.roomCode);
   const peers = useAppStore((s) => s.peers);
+  const mySeat = useAppStore((s) => s.mySeat);
   const netError = useAppStore((s) => s.netError);
 
+  const myReady = peers.find((p) => p.seat === mySeat)?.ready ?? false;
+
+  // Cleanup everything when the screen unmounts.
   useEffect(() => {
     return () => {
       sessionRef.current?.dispose();
@@ -99,11 +117,12 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
   }, [roomCode]);
 
   /** Wire handlers onto a socket (initial connect and every reconnect). */
-  const attach = useCallback((ws: WsClient, nick: string) => {
+  const attach = useCallback((ws: WsClient) => {
     ws.on((msg) => {
+      if (msg.type === 'ping') return; // liveness only
       if (msg.type === 'room:created' || msg.type === 'room:joined') {
-        saveRejoin({ code: msg.code, token: msg.token, seat: msg.seat, nickname: nick });
-        useAppStore.setState({ roomCode: msg.code, mySeat: msg.seat });
+        saveRejoin({ code: msg.code, token: msg.token, seat: msg.seat, nickname: nickRef.current });
+        useAppStore.setState({ roomCode: msg.code, mySeat: msg.seat, netError: null });
         const game = getGame();
         if (game) {
           void game.whenReady().then(() => {
@@ -118,7 +137,10 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
         }
         setStage((s) => (s === 'game' ? 'game' : 'lobby'));
       } else if (msg.type === 'error') {
-        if (msg.code === 'ROOM_NOT_FOUND' || msg.code === 'BAD_TOKEN') clearRejoin();
+        if (msg.code === 'ROOM_NOT_FOUND' || msg.code === 'BAD_TOKEN') {
+          clearRejoin();
+          useAppStore.setState({ netError: 'This room no longer exists.' });
+        }
         setError(msg.msg);
         if (stageRef.current === 'connecting') setStage('form');
       } else if (msg.type === 'room:closed') {
@@ -130,42 +152,75 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
               : 'The room was closed.',
         });
       } else if (!sessionRef.current) {
-        pendingRef.current.push(msg);
+        if (pendingRef.current.length < 200) pendingRef.current.push(msg);
       }
     });
-    ws.onClose = () => void handleClose(ws, nick);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    ws.onClose = () => {
+      if (wsRef.current === ws) recoverRef.current();
+    };
+  }, []);
 
-  const handleClose = useCallback(async (ws: WsClient, nick: string) => {
-    if (wsRef.current !== ws) return; // superseded socket
+  /** The one reconnect path for every in-room stage. */
+  const recover = useCallback(async () => {
+    if (recoveringRef.current) return;
     const info = loadRejoin();
     const s = useAppStore.getState();
-    const midMatch = s.matchActive && s.matchPhase !== 'end';
-    if (!info || !midMatch) {
-      if (stageRef.current !== 'form') {
-        useAppStore.setState({ netError: 'Connection to the server was lost.' });
-      }
-      return;
-    }
+    if (!info || s.roomCode === null || s.netError) return;
+    recoveringRef.current = true;
     setReconnecting(true);
-    for (let attempt = 0; attempt < 6; attempt++) {
-      await sleep(Math.min(5000, 800 * 2 ** attempt));
-      if (wsRef.current !== ws && wsRef.current !== null) return; // replaced already
-      try {
-        const next = new WsClient();
-        await next.connect();
-        wsRef.current = next;
-        attach(next, nick);
-        next.send({ type: 'room:rejoin', v: PROTOCOL_VERSION, code: info.code, token: info.token });
-        setReconnecting(false);
-        return;
-      } catch {
-        // keep trying
+    try {
+      for (let attempt = 0; attempt < 8; attempt++) {
+        if (wsRef.current?.connected) return; // something else fixed it
+        try {
+          const next = new WsClient();
+          await next.connect();
+          wsRef.current?.close();
+          wsRef.current = next;
+          attach(next);
+          next.send({
+            type: 'room:rejoin',
+            v: PROTOCOL_VERSION,
+            code: info.code,
+            token: info.token,
+          });
+          return;
+        } catch {
+          await sleep(Math.min(5000, 700 * 2 ** attempt));
+        }
       }
+      useAppStore.setState({ netError: 'Could not reconnect to the server.' });
+    } finally {
+      recoveringRef.current = false;
+      setReconnecting(false);
     }
-    setReconnecting(false);
-    useAppStore.setState({ netError: 'Could not reconnect to the server.' });
   }, [attach]);
+  recoverRef.current = () => void recover();
+
+  // Watchdog: wake-ups and a 5s pulse catch silently dead sockets.
+  useEffect(() => {
+    const check = () => {
+      const s = useAppStore.getState();
+      if (s.roomCode === null || s.netError) return;
+      const ws = wsRef.current;
+      if (!ws || !ws.connected || ws.sinceLastMessage() > STALE_MS) {
+        ws?.close();
+        recoverRef.current();
+      } else {
+        ws.send({ type: 'pong' }); // transport probe: dead sockets error fast
+      }
+    };
+    const onWake = () => setTimeout(check, 300);
+    const iv = setInterval(check, 5000);
+    document.addEventListener('visibilitychange', onWake);
+    window.addEventListener('pageshow', onWake);
+    window.addEventListener('focus', onWake);
+    return () => {
+      clearInterval(iv);
+      document.removeEventListener('visibilitychange', onWake);
+      window.removeEventListener('pageshow', onWake);
+      window.removeEventListener('focus', onWake);
+    };
+  }, []);
 
   const connect = useCallback(async () => {
     const info = mode === 'rejoin' ? loadRejoin() : null;
@@ -174,6 +229,7 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
       return;
     }
     const nick = (mode === 'rejoin' ? info!.nickname : nickname.trim()) || 'Player';
+    nickRef.current = nick;
     saveNickname(nick);
     setError(null);
     setStage('connecting');
@@ -181,7 +237,7 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
       const ws = new WsClient();
       await ws.connect();
       wsRef.current = ws;
-      attach(ws, nick);
+      attach(ws);
       if (mode === 'create') {
         ws.send({ type: 'room:create', v: PROTOCOL_VERSION, nickname: nick });
       } else if (mode === 'join') {
@@ -207,11 +263,8 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
   }, [mode]);
 
   const toggleReady = useCallback(() => {
-    setReady((r) => {
-      wsRef.current?.send({ type: 'lobby:ready', ready: !r });
-      return !r;
-    });
-  }, []);
+    wsRef.current?.send({ type: 'lobby:ready', ready: !myReady });
+  }, [myReady]);
 
   const onExit = useCallback(() => {
     sessionRef.current?.leave();
@@ -230,19 +283,13 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
           onLoadoutReady={() => sessionRef.current?.loadoutReady()}
           onSelectWeapon={(id) => sessionRef.current?.selectWeapon(id)}
           onAimBy={(d) => sessionRef.current?.aimBy(d, 0)}
-          onSetPower={(p) =>
-            sessionRef.current?.setAim(useAppStore.getState().aim.angle, p)
-          }
+          onSetPower={(p) => sessionRef.current?.setAim(useAppStore.getState().aim.angle, p)}
           onFire={() => {
             const s = useAppStore.getState();
             if (s.matchPhase === 'aim' && !s.shopOpen && !s.menuOpen) sessionRef.current?.fire();
           }}
         />
-        {reconnecting && (
-          <div className="pointer-events-none absolute top-32 left-1/2 -translate-x-1/2 rounded-full border border-amber-300/30 bg-amber-400/20 px-5 py-2 text-sm font-semibold text-amber-100 backdrop-blur-xl">
-            Reconnecting…
-          </div>
-        )}
+        {reconnecting && <ReconnectingPill />}
         {netError && <ErrorOverlay message={netError} onHome={onExit} />}
       </>
     );
@@ -280,7 +327,7 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
                 />
               </label>
             )}
-            {error && <p className="text-sm text-red-300">{error}</p>}
+            {(error ?? netError) && <p className="text-sm text-red-300">{error ?? netError}</p>}
             {mode !== 'rejoin' && (
               <Button
                 onClick={() => void connect()}
@@ -314,12 +361,15 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
               Share the code or scan from a phone on the same Wi-Fi.
             </p>
             <div className="flex flex-col gap-1.5">
-              {peers.map((p, i) => (
+              {peers.map((p) => (
                 <div
-                  key={i}
+                  key={p.seat}
                   className="flex items-center justify-between rounded-xl bg-black/20 px-4 py-2"
                 >
-                  <span className="text-sm font-semibold text-white/85">{p.nickname}</span>
+                  <span className="text-sm font-semibold text-white/85">
+                    {p.nickname}
+                    {p.seat === mySeat && <span className="text-white/40"> (you)</span>}
+                  </span>
                   <span className={`text-xs ${p.ready ? 'text-emerald-300' : 'text-white/40'}`}>
                     {p.connected ? (p.ready ? 'ready' : 'waiting') : 'disconnected'}
                   </span>
@@ -331,9 +381,12 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
                 </div>
               )}
             </div>
-            {error && <p className="text-sm text-red-300">{error}</p>}
-            <Button onClick={toggleReady} variant={ready ? 'glass' : 'primary'}>
-              {ready ? 'Not ready' : 'Ready'}
+            {reconnecting && (
+              <p className="text-center text-xs font-semibold text-amber-200">Reconnecting…</p>
+            )}
+            {(error ?? netError) && <p className="text-sm text-red-300">{error ?? netError}</p>}
+            <Button onClick={toggleReady} variant={myReady ? 'glass' : 'primary'}>
+              {myReady ? 'Not ready' : 'Ready'}
             </Button>
             <Button variant="glass" onClick={onExit}>
               Leave
@@ -341,6 +394,14 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
           </>
         )}
       </GlassPanel>
+    </div>
+  );
+}
+
+function ReconnectingPill() {
+  return (
+    <div className="pointer-events-none absolute top-32 left-1/2 -translate-x-1/2 rounded-full border border-amber-300/30 bg-amber-400/20 px-5 py-2 text-sm font-semibold text-amber-100 backdrop-blur-xl">
+      Reconnecting…
     </div>
   );
 }

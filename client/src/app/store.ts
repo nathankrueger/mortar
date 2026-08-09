@@ -61,7 +61,7 @@ interface AppState {
   // Online-play state (written by NetworkSession / OnlineScreen).
   mySeat: Seat | null;
   roomCode: string | null;
-  peers: { nickname: string; connected: boolean; ready: boolean }[];
+  peers: { seat: Seat; nickname: string; connected: boolean; ready: boolean }[];
   loadoutDone: [boolean, boolean];
   rematchVotes: [boolean, boolean];
   oppConnected: boolean;

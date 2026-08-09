@@ -236,11 +236,31 @@ describe('Room', () => {
     expect(winnerSock.last('room:closed')).toEqual({ type: 'room:closed', reason: 'opponentLeft' });
   });
 
-  it('disconnect in lobby frees the seat', () => {
-    const { room, a } = setupLobby();
+  it('lobby disconnect holds the seat (ready flag intact) through a grace window', () => {
+    const { room, a, b } = setupLobby();
+    room.handleMsg(1, { type: 'lobby:ready', ready: true });
     room.onDisconnect(1);
-    const peers = a.last('room:peers')!;
-    expect(peers.peers.length).toBe(1);
+    // Seat still held and marked disconnected — no one can steal it.
+    let peers = a.last('room:peers')!;
+    expect(peers.peers.length).toBe(2);
+    expect(peers.peers[1]).toMatchObject({ connected: false, ready: true });
+    expect(room.addPlayer(asWs(new FakeSocket()), 'Carol')).toBe('full');
+
+    // Rejoining by token restores the connection with ready still set.
+    const token = (room as unknown as { seats: { token: string }[] }).seats[1].token;
+    const back = new FakeSocket();
+    expect(room.rejoin(asWs(back), token)).toBe(1);
+    room.broadcastPeers();
+    peers = a.last('room:peers')!;
+    expect(peers.peers[1]).toMatchObject({ connected: true, ready: true });
+    void b;
+  });
+
+  it('lobby seat frees only after the grace window expires', () => {
+    const { room } = setupLobby();
+    room.onDisconnect(1);
+    expect(room.addPlayer(asWs(new FakeSocket()), 'Carol')).toBe('full');
+    vi.advanceTimersByTime(121_000);
     expect(room.addPlayer(asWs(new FakeSocket()), 'Carol')).not.toBe('full');
   });
 });

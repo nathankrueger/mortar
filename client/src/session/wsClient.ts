@@ -6,6 +6,7 @@ export type ServerHandler = (msg: ServerMsg) => void;
 export class WsClient {
   private ws: WebSocket | null = null;
   private handlers = new Set<ServerHandler>();
+  private lastMsgAt = Date.now();
   onClose: ((clean: boolean) => void) | null = null;
 
   connect(): Promise<void> {
@@ -18,6 +19,7 @@ export class WsClient {
       };
       ws.onerror = () => reject(new Error('could not reach the game server'));
       ws.onmessage = (ev) => {
+        this.lastMsgAt = Date.now();
         const msg = decodeServer(String(ev.data));
         if (!msg) return;
         for (const h of [...this.handlers]) h(msg);
@@ -32,6 +34,12 @@ export class WsClient {
 
   get connected(): boolean {
     return this.ws?.readyState === WebSocket.OPEN;
+  }
+
+  /** Ms since any server traffic — the server heartbeats every 10s, so a
+   * large value means the socket is a zombie even if readyState says OPEN. */
+  sinceLastMessage(): number {
+    return Date.now() - this.lastMsgAt;
   }
 
   send(msg: ClientMsg): void {

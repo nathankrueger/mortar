@@ -140,6 +140,7 @@ export type ClientMsg = z.infer<typeof ClientMsgSchema>;
 // ---- Server → Client ------------------------------------------------------
 
 const peerInfo = z.object({
+  seat,
   nickname,
   connected: z.boolean(),
   ready: z.boolean(),
@@ -163,7 +164,7 @@ export const ServerMsgSchema = z.discriminatedUnion('type', [
     token,
     v: z.number().int(),
   }),
-  z.object({ type: z.literal('room:peers'), peers: z.array(peerInfo).length(2).or(z.array(peerInfo).length(1)) }),
+  z.object({ type: z.literal('room:peers'), peers: z.array(peerInfo).max(2) }),
   z.object({
     type: z.literal('match:start'),
     matchSeed: z.number().int(),
