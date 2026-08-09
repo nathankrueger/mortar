@@ -1,5 +1,8 @@
 /** Platform sniffs for the fullscreen story, which differs per OS. */
 
+export const IS_COARSE_POINTER =
+  typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+
 export const IS_IOS =
   typeof navigator !== 'undefined' &&
   (/iPhone|iPad|iPod/.test(navigator.userAgent) ||

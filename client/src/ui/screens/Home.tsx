@@ -80,7 +80,10 @@ export function Home() {
             dev · sandbox →
           </button>
         </div>
-        <p className="mt-1 font-mono text-[10px] text-white/30">build {__BUILD_ID__}</p>
+        <p className="mt-1 font-mono text-[10px] text-white/30">
+          build {__BUILD_ID__} · {window.innerWidth}×{window.innerHeight}@
+          {window.devicePixelRatio}
+        </p>
       </GlassPanel>
     </div>
   );

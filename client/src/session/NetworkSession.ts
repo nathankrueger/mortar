@@ -209,6 +209,7 @@ export class NetworkSession implements GameSession {
         alive: msg.hp[i] > 0,
       }));
       this.pushScene();
+      this.game.focusTank(this.turnSeat);
       this.pushStore();
       useAppStore.setState({ loadoutDone: msg.loadoutDone, oppConnected: true });
       if (this.phase === 'end') {
@@ -238,6 +239,7 @@ export class NetworkSession implements GameSession {
     sfx.turn();
     this.game.setWind(this.wind);
     this.pushScene();
+    this.game.focusTank(msg.seat);
     this.pushStore();
     useAppStore.setState({ shopOpen: false });
   }

@@ -10,8 +10,9 @@ import {
 } from '@mortar/shared';
 import { WEAPONS, type WeaponId } from '@mortar/shared';
 import { Application, Container, Sprite, Texture } from 'pixi.js';
+import { IS_COARSE_POINTER } from '../app/platform';
 import { sfx } from '../audio/sfx';
-import { Camera } from './camera';
+import { Camera, type InterestBox } from './camera';
 import { ShotPlayback, type PlaybackDelegate } from './playback';
 import { CloudLayer } from './scene/CloudLayer';
 import { FxLayer } from './scene/FxLayer';
@@ -55,7 +56,7 @@ export interface ShotHooks {
 export class GameApp {
   readonly app = new Application();
   readonly worldRoot = new Container();
-  readonly camera = new Camera(this.worldRoot);
+  readonly camera = new Camera(this.worldRoot, IS_COARSE_POINTER);
   readonly sky = new SkyLayer();
   readonly clouds = new CloudLayer();
   readonly shake = new ScreenShake();
@@ -81,6 +82,8 @@ export class GameApp {
   private disposed = false;
   private pendingSeed: number | null = null;
   private readyResolvers: (() => void)[] = [];
+  private lastHostW = 0;
+  private lastHostH = 0;
 
   async init(host: HTMLElement): Promise<void> {
     this.host = host;
@@ -109,20 +112,7 @@ export class GameApp {
     this.screenFlash.alpha = 0;
     this.app.stage.addChild(this.screenFlash);
 
-    const onResize = () => {
-      // Logical (CSS) size — renderer.width/height are PHYSICAL pixels, and
-      // on a dpr>1 phone using those aims the camera off-screen (pure sky).
-      const { width, height } = this.app.renderer.screen;
-      this.camera.setViewport(width, height);
-      this.sky.resize(width, height);
-      if (this.screenFlash) {
-        this.screenFlash.width = width;
-        this.screenFlash.height = height;
-      }
-    };
-    this.app.renderer.on('resize', onResize);
-    onResize();
-
+    this.syncViewport(true);
     this.app.ticker.add((ticker) => this.tick(ticker.deltaMS / 1000));
 
     this.ready = true;
@@ -200,6 +190,12 @@ export class GameApp {
 
   setAim(seat: Seat, angleDeg: number): void {
     this.tanks.get(seat)?.setAim(angleDeg);
+  }
+
+  /** Phone camera rests on whoever is up. */
+  focusTank(seat: Seat): void {
+    const t = this.tanks.get(seat);
+    if (t) this.camera.setFocus(t.container.x, t.container.y);
   }
 
   /** Per-turn wind: drives cloud drift and weather shear. */
@@ -285,16 +281,61 @@ export class GameApp {
     return this.playback !== null;
   }
 
+  /**
+   * Re-measure the host and re-frame everything when its size changed.
+   * Polled every frame instead of trusting resize events — iOS Safari
+   * delivers stale sizes around rotation, which used to leave a portrait
+   * camera on a landscape screen (nothing but sky).
+   */
+  private syncViewport(force = false): void {
+    const host = this.host;
+    if (!host) return;
+    const w = host.clientWidth;
+    const h = host.clientHeight;
+    if (!force && w === this.lastHostW && h === this.lastHostH) return;
+    if (w <= 0 || h <= 0) return;
+    this.lastHostW = w;
+    this.lastHostH = h;
+    this.app.resize(); // let Pixi adopt the new canvas size now
+    // Logical (CSS) size — renderer.width/height are PHYSICAL pixels, and
+    // on a dpr>1 phone using those aims the camera off-screen (pure sky).
+    const { width, height } = this.app.renderer.screen;
+    this.camera.setViewport(width, height);
+    this.sky.resize(width, height);
+    if (this.screenFlash) {
+      this.screenFlash.width = width;
+      this.screenFlash.height = height;
+    }
+  }
+
+  /** On phones the camera pans to the shells in flight; desktop stays wide. */
+  private followInterest(): InterestBox | null {
+    if (!IS_COARSE_POINTER || !this.playback) return null;
+    const pts = [...this.projectiles.positions(), ...this.fx.hotPoints()];
+    if (pts.length === 0) return null;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const p of pts) {
+      x0 = Math.min(x0, p.x);
+      y0 = Math.min(y0, p.y);
+      x1 = Math.max(x1, p.x);
+      y1 = Math.max(y1, p.y);
+    }
+    return { x0, y0, x1, y1 };
+  }
+
   private tick(rawDt: number): void {
     const dt = Math.min(rawDt, 0.1); // clamp tab-switch jumps
+    this.syncViewport();
     this.playback?.update(dt);
     if (this.screenFlash && this.screenFlash.alpha > 0) {
       this.screenFlash.alpha = Math.max(0, this.screenFlash.alpha - dt * 1.1);
     }
     for (const t of this.tanks.values()) t.update(dt);
     this.shake.update(dt, this.camera);
-    // Fixed overview framing — no projectile follow/zoom (it read poorly).
-    this.camera.update(dt, null);
+    this.camera.update(dt, this.followInterest());
     this.sky.update(dt, this.camera.worldLeft, this.camera.currentScale);
     this.clouds.update(dt);
     this.fx.update(dt);

@@ -1,8 +1,7 @@
 import { POWER_MAX, POWER_MIN } from '@mortar/shared';
 import { useCallback, useRef } from 'react';
 
-export const IS_COARSE_POINTER =
-  typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+export { IS_COARSE_POINTER } from '../../app/platform';
 
 /**
  * Touch controls: horizontal drag anywhere on the field swings the barrel,
