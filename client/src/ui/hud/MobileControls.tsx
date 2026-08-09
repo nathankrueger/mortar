@@ -54,7 +54,7 @@ function DragAimLayer({ onAimBy }: { onAimBy: (dAngle: number) => void }) {
       const dx = e.clientX - lastX.current;
       lastX.current = e.clientX;
       // Swipe right = barrel right (clockwise = smaller angle).
-      onAimBy(-dx * 0.22);
+      onAimBy(-dx * ANGLE_PER_PX);
     },
     [onAimBy],
   );
@@ -75,7 +75,9 @@ function DragAimLayer({ onAimBy }: { onAimBy: (dAngle: number) => void }) {
 }
 
 /** Power gained per pixel of drag — geared low so exact values are easy. */
-const POWER_PER_PX = 0.3;
+const POWER_PER_PX = 0.15;
+/** Degrees of barrel swing per pixel of horizontal drag. */
+const ANGLE_PER_PX = 0.1;
 
 function PowerSlider({
   power,
