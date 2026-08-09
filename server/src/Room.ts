@@ -120,9 +120,23 @@ export class Room {
       return;
     }
     this.broadcast({ type: 'room:peerConnection', seat, connected: false });
-    if (this.phase !== 'ended' && !this.forfeitTimer) {
-      this.forfeitTimer = setTimeout(() => this.forfeit(seat), 180_000);
+    if (!this.forfeitTimer) {
+      // Mid-match: long grace, then forfeit. After the match: a short window —
+      // if they don't return, any pending rematch offer is dead and the
+      // survivor shouldn't wait on it.
+      this.forfeitTimer =
+        this.phase !== 'ended'
+          ? setTimeout(() => this.forfeit(seat), 180_000)
+          : setTimeout(() => this.abandonAfterEnd(seat), 60_000);
     }
+  }
+
+  /** Opponent never came back after the match ended: close out the room. */
+  private abandonAfterEnd(gone: Seat): void {
+    this.forfeitTimer = null;
+    if (this.phase !== 'ended' || this.seats[gone]?.ws) return; // rejoined
+    this.send((1 - gone) as Seat, { type: 'room:closed', reason: 'opponentLeft' });
+    this.seats[gone] = null;
   }
 
   /** Full mid-match state for a rejoining client. */
@@ -427,6 +441,9 @@ export class Room {
     const other = (1 - seat) as Seat;
     if (this.phase !== 'ended' && this.phase !== 'lobby') {
       this.endMatch(other, 'forfeit');
+    } else if (this.phase === 'ended') {
+      // Walking out on the end screen kills any rematch offer immediately.
+      this.send(other, { type: 'room:closed', reason: 'opponentLeft' });
     }
     this.seats[seat]?.ws?.close();
     this.seats[seat] = null;

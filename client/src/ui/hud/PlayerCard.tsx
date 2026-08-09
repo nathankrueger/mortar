@@ -6,10 +6,13 @@ export function PlayerCard({
   seat,
   data,
   active,
+  hideCredits = false,
 }: {
   seat: 0 | 1;
   data: SeatHud;
   active: boolean;
+  /** Online: the opponent's purchasing power is their business. */
+  hideCredits?: boolean;
 }) {
   const pct = Math.max(0, Math.min(1, data.hp / data.maxHp));
   return (
@@ -33,9 +36,11 @@ export function PlayerCard({
       </div>
       <div className="flex items-baseline justify-between">
         <span className="text-xs font-medium text-white/60">{data.hp} HP</span>
-        <span className="font-mono text-xs font-semibold text-emerald-300/90">
-          {data.credits.toLocaleString()} cr
-        </span>
+        {!hideCredits && (
+          <span className="font-mono text-xs font-semibold text-emerald-300/90">
+            {data.credits.toLocaleString()} cr
+          </span>
+        )}
       </div>
     </div>
   );

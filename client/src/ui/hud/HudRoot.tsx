@@ -57,10 +57,12 @@ export function HudRoot({
   const menuOpen = useAppStore((s) => s.menuOpen);
   const setMenuOpen = useAppStore((s) => s.setMenuOpen);
 
-  const shopSeat = phase === 'loadout' ? (loadoutSeat ?? 0) : turnSeat;
   const aiTurn = aiSeat !== null && turnSeat === aiSeat;
-  const canAct =
-    phase === 'aim' && !aiTurn && (mySeat === null || turnSeat === mySeat) && !shopOpen && !menuOpen;
+  const myTurn = phase === 'aim' && !aiTurn && (mySeat === null || turnSeat === mySeat);
+  const canAct = myTurn && !shopOpen && !menuOpen;
+  // Online, the tray and shop always show YOUR arsenal — never the opponent's.
+  const arsenalSeat = mySeat ?? turnSeat;
+  const shopSeat = phase === 'loadout' ? (loadoutSeat ?? 0) : arsenalSeat;
 
   return (
     <div className="pointer-events-none absolute inset-0 select-none">
@@ -79,12 +81,22 @@ export function HudRoot({
           >
             <span className="text-lg leading-none">≡</span>
           </button>
-          <PlayerCard seat={0} data={seats[0]} active={turnSeat === 0 && phase === 'aim'} />
+          <PlayerCard
+            seat={0}
+            data={seats[0]}
+            active={turnSeat === 0 && phase === 'aim'}
+            hideCredits={mySeat !== null && mySeat !== 0}
+          />
         </div>
         <div className="mt-1 flex flex-col items-center gap-2">
           <WindPill wind={wind} />
         </div>
-        <PlayerCard seat={1} data={seats[1]} active={turnSeat === 1 && phase === 'aim'} />
+        <PlayerCard
+          seat={1}
+          data={seats[1]}
+          active={turnSeat === 1 && phase === 'aim'}
+          hideCredits={mySeat !== null && mySeat !== 1}
+        />
       </div>
 
       {/* Turn banner */}
@@ -107,11 +119,11 @@ export function HudRoot({
           <WeaponBar
             selected={weapon}
             onSelect={onSelectWeapon}
-            counts={sandbox ? undefined : inventories[turnSeat]}
+            counts={sandbox ? undefined : inventories[arsenalSeat]}
             compact={IS_COARSE_POINTER}
           />
           <div className="flex items-center gap-3">
-            {!sandbox && phase === 'aim' && !aiTurn && (
+            {!sandbox && myTurn && (
               <button
                 onClick={() => setShopOpen(true)}
                 className="pointer-events-auto cursor-pointer rounded-full border border-emerald-300/30 bg-emerald-400/15 px-4 py-2 text-xs font-bold text-emerald-200 backdrop-blur-xl transition-all hover:bg-emerald-400/25 active:scale-95"
@@ -159,8 +171,8 @@ export function HudRoot({
         </div>
       )}
 
-      {/* In-turn shop */}
-      {shopOpen && phase === 'aim' && (
+      {/* In-turn shop — only on your own turn, only your own wallet. */}
+      {shopOpen && myTurn && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/25 backdrop-blur-[2px]">
           <ShopPanel
             title={`${seats[shopSeat].nickname} — battlefield shop`}

@@ -123,7 +123,12 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
         if (stageRef.current === 'connecting') setStage('form');
       } else if (msg.type === 'room:closed') {
         clearRejoin();
-        useAppStore.setState({ netError: 'The room was closed.' });
+        useAppStore.setState({
+          netError:
+            msg.reason === 'opponentLeft'
+              ? 'Your opponent left — no rematch this time.'
+              : 'The room was closed.',
+        });
       } else if (!sessionRef.current) {
         pendingRef.current.push(msg);
       }

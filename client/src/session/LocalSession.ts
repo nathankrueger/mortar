@@ -191,6 +191,7 @@ export class LocalSession implements GameSession {
     this.game.setWind(this.wind);
     this.pushScene();
     this.pushStore();
+    useAppStore.setState({ shopOpen: false });
     if (this.isAiSeat(seat)) {
       const [lo, hi] = AI_PROFILES[this.options.ai!.difficulty].thinkMs;
       this.later(lo + Math.random() * (hi - lo), () => void this.runAiTurn());

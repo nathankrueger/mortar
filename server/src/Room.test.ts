@@ -170,6 +170,50 @@ describe('Room', () => {
     expect(a2.last('match:end')?.reason).toBe('forfeit');
   });
 
+  /** Ends the match by having the current turn-holder land a lethal shot. */
+  function killMatch(room: Room, a: FakeSocket, b: FakeSocket): { winner: 0 | 1 } {
+    const shooter = a.last('turn:begin')!.seat;
+    const victim = (1 - shooter) as 0 | 1;
+    room.handleMsg(shooter, {
+      type: 'shot:fire',
+      weapon: 'mortar',
+      angleDeci: 450,
+      power: 50,
+      events: [
+        { t: 'damage', seat: victim, amount: 100, direct: false, hpAfter: 0, tick: 1 },
+        { t: 'die', seat: victim, tick: 1 },
+      ] as never,
+      ticks: 10,
+    });
+    vi.advanceTimersByTime(3000);
+    expect(a.last('match:end')).toEqual({ type: 'match:end', winner: shooter, reason: 'destroyed' });
+    return { winner: shooter };
+  }
+
+  it('leaving the end screen kills a pending rematch offer immediately', () => {
+    const { room, a, b } = setupLobby();
+    startMatch(room, a, b);
+    const { winner } = killMatch(room, a, b);
+    const loser = (1 - winner) as 0 | 1;
+    const winnerSock = winner === 0 ? a : b;
+    room.handleMsg(winner, { type: 'match:rematch', accept: true }); // waiting…
+    room.handleMsg(loser, { type: 'room:leave' });
+    expect(winnerSock.last('room:closed')).toEqual({ type: 'room:closed', reason: 'opponentLeft' });
+  });
+
+  it('silently disconnecting after the end resolves the rematch wait within a minute', () => {
+    const { room, a, b } = setupLobby();
+    startMatch(room, a, b);
+    const { winner } = killMatch(room, a, b);
+    const loser = (1 - winner) as 0 | 1;
+    const winnerSock = winner === 0 ? a : b;
+    room.handleMsg(winner, { type: 'match:rematch', accept: true });
+    room.onDisconnect(loser); // tab closed, no room:leave
+    expect(winnerSock.last('room:closed')).toBeUndefined(); // grace window first
+    vi.advanceTimersByTime(61_000);
+    expect(winnerSock.last('room:closed')).toEqual({ type: 'room:closed', reason: 'opponentLeft' });
+  });
+
   it('disconnect in lobby frees the seat', () => {
     const { room, a } = setupLobby();
     room.onDisconnect(1);

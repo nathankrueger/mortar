@@ -239,6 +239,7 @@ export class NetworkSession implements GameSession {
     this.game.setWind(this.wind);
     this.pushScene();
     this.pushStore();
+    useAppStore.setState({ shopOpen: false });
   }
 
   private onShotResolved(msg: Extract<ServerMsg, { type: 'shot:resolved' }>): void {
