@@ -1,4 +1,11 @@
-import { AI_PROFILES, type AiDifficulty, type Seat, type WeaponId } from '@mortar/shared';
+import {
+  AI_PROFILES,
+  resolveConfig,
+  type AiDifficulty,
+  type MatchConfig,
+  type Seat,
+  type WeaponId,
+} from '@mortar/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { navigate } from '../../app/routes';
 import { randomSeed, useAppStore } from '../../app/store';
@@ -14,9 +21,11 @@ import { HudRoot } from '../hud/HudRoot';
 export function HotseatScreen({
   sandbox = false,
   ai,
+  config,
 }: {
   sandbox?: boolean;
   ai?: { seat: Seat; difficulty: AiDifficulty };
+  config?: Partial<MatchConfig>;
 }) {
   const [runId, setRunId] = useState(0);
   const sessionRef = useRef<LocalSession | null>(null);
@@ -35,7 +44,10 @@ export function HotseatScreen({
       const nicknames: [string, string] | undefined = ai
         ? ['You', `Computer · ${AI_PROFILES[ai.difficulty].label}`]
         : undefined;
-      session = new LocalSession(game, randomSeed(), undefined, nicknames, { sandbox, ai });
+      session = new LocalSession(game, randomSeed(), resolveConfig(config), nicknames, {
+        sandbox,
+        ai,
+      });
       sessionRef.current = session;
       session.start();
       keyboard = new KeyboardInput({
@@ -64,7 +76,8 @@ export function HotseatScreen({
       sessionRef.current = null;
       useAppStore.getState().clearMatch();
     };
-  }, [runId, sandbox, ai]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runId, sandbox, ai, JSON.stringify(config)]);
 
   const onSelect = useCallback((id: WeaponId) => sessionRef.current?.selectWeapon(id), []);
   const onBuy = useCallback((id: WeaponId) => sessionRef.current?.buy(id), []);

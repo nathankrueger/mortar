@@ -55,8 +55,8 @@ function addOctave(rng: Rng, out: Float64Array, spacing: number, amplitude: numb
   }
 }
 
-function macroOffset(macro: MacroFeature, x: number): number {
-  const t = x / WORLD_W;
+function macroOffset(macro: MacroFeature, x: number, worldW: number): number {
+  const t = x / worldW;
   switch (macro) {
     case 'rolling':
       return 0;
@@ -76,9 +76,9 @@ function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
 }
 
-export function generateTerrain(seed: number): GeneratedTerrain {
+export function generateTerrain(seed: number, worldW = WORLD_W): GeneratedTerrain {
   const rng = mulberry32(deriveSeed(seed, SALT_TERRAIN));
-  const w = WORLD_W;
+  const w = worldW;
 
   // 1) Fractal value noise. RNG consumption order is fixed — never reorder.
   const noise = new Float64Array(w);
@@ -101,7 +101,7 @@ export function generateTerrain(seed: number): GeneratedTerrain {
   const heights = new Float64Array(w);
   for (let x = 0; x < w; x++) {
     const n = noise[x] / ampSum; // ~[0,1]
-    const y = BASE_LEVEL - (n - 0.5) * 2 * NOISE_AMPLITUDE - macroOffset(macro, x);
+    const y = BASE_LEVEL - (n - 0.5) * 2 * NOISE_AMPLITUDE - macroOffset(macro, x, w);
     heights[x] = clamp(y, SURFACE_MIN, SURFACE_MAX);
   }
 

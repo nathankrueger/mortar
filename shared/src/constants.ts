@@ -15,7 +15,16 @@ export const WIND_MAX_DEFAULT = 120; // wu/s^2
 
 export const POWER_MIN = 5;
 export const POWER_MAX = 100;
-export const MUZZLE_SPEED_PER_POWER = 14; // v0 = power * 14 wu/s
+export const MUZZLE_SPEED_PER_POWER = 14; // v0 at the default world width
+
+/**
+ * Muzzle speed per power unit, scaled so a max-power 45° shot spans roughly
+ * the whole field regardless of its configured width (range = v²/g).
+ * At the default 2400 wu this evaluates to ≈13.9, matching the classic feel.
+ */
+export function muzzlePerPower(worldW: number): number {
+  return Math.sqrt(GRAVITY * worldW) / POWER_MAX;
+}
 
 // Angle convention: degrees in (0, 180], measured CCW from +x.
 // 90 = straight up, <90 fires right, >90 fires left.

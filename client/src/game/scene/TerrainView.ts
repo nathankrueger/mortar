@@ -22,7 +22,6 @@ export interface TerrainView {
 
 const TILE_W = 300;
 const TILE_H = 450;
-const COLS = WORLD_W / TILE_W; // 8
 const ROWS = WORLD_H / TILE_H; // 3
 
 interface Tile {
@@ -32,6 +31,7 @@ interface Tile {
   sprite: Sprite;
   x0: number;
   y0: number;
+  w: number;
 }
 
 /**
@@ -43,21 +43,26 @@ export class CpuTileTerrain implements TerrainView {
   readonly container = new Container();
   private tiles: Tile[] = [];
   private surfaces: Float64Array = new Float64Array(WORLD_W);
+  private width = WORLD_W;
+  private cols = 0;
   private theme: TerrainTheme | null = null;
   private noise: CanvasPattern | null = null;
 
   init(heights: Float64Array, theme: TerrainTheme): void {
     this.disposeTiles();
     this.surfaces = Float64Array.from(heights);
+    this.width = heights.length;
+    this.cols = Math.ceil(this.width / TILE_W);
     this.theme = theme;
     this.noise = makeNoisePattern();
 
     for (let row = 0; row < ROWS; row++) {
-      for (let col = 0; col < COLS; col++) {
+      for (let col = 0; col < this.cols; col++) {
         const x0 = col * TILE_W;
         const y0 = row * TILE_H;
+        const tileW = Math.min(TILE_W, this.width - x0);
         const canvas = document.createElement('canvas');
-        canvas.width = TILE_W;
+        canvas.width = tileW;
         canvas.height = TILE_H;
         const ctx = canvas.getContext('2d')!;
         const tile: Tile = {
@@ -67,6 +72,7 @@ export class CpuTileTerrain implements TerrainView {
           sprite: new Sprite(),
           x0,
           y0,
+          w: tileW,
         };
         this.paintTile(tile);
         tile.texture = Texture.from(canvas);
@@ -89,13 +95,13 @@ export class CpuTileTerrain implements TerrainView {
       if (!c.add) scorches.push(c);
       if (!range) continue;
       const c0 = Math.max(0, Math.floor((range.x0 - 10) / TILE_W));
-      const c1 = Math.min(COLS - 1, Math.floor((range.x1 + 10) / TILE_W));
+      const c1 = Math.min(this.cols - 1, Math.floor((range.x1 + 10) / TILE_W));
       for (let col = c0; col <= c1; col++) dirtyCols.add(col);
     }
 
     for (const col of dirtyCols) {
       for (let row = 0; row < ROWS; row++) {
-        const tile = this.tiles[row * COLS + col];
+        const tile = this.tiles[row * this.cols + col];
         this.paintTile(tile);
         // Char the rims of fresh craters that touch this tile.
         for (const c of scorches) this.scorch(tile, c);
@@ -108,11 +114,11 @@ export class CpuTileTerrain implements TerrainView {
   private paintTile(tile: Tile): void {
     const theme = this.theme;
     if (!theme) return;
-    const { ctx, x0, y0 } = tile;
+    const { ctx, x0, y0, w: tileW } = tile;
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = 'source-over';
-    ctx.clearRect(0, 0, TILE_W, TILE_H);
+    ctx.clearRect(0, 0, tileW, TILE_H);
     ctx.translate(-x0, -y0);
 
     // 1) Soil strata gradient across the whole world height.
@@ -120,19 +126,19 @@ export class CpuTileTerrain implements TerrainView {
     g.addColorStop(0, cssColor(theme.soilTop));
     g.addColorStop(1, cssColor(theme.soilDeep));
     ctx.fillStyle = g;
-    ctx.fillRect(x0, y0, TILE_W, TILE_H);
+    ctx.fillRect(x0, y0, tileW, TILE_H);
 
     // 2) Grain so the dirt isn't a flat wash.
     if (this.noise) {
       ctx.globalAlpha = 0.5;
       ctx.fillStyle = this.noise;
-      ctx.fillRect(x0, y0, TILE_W, TILE_H);
+      ctx.fillRect(x0, y0, tileW, TILE_H);
       ctx.globalAlpha = 1;
     }
 
     // 3) Cut away everything above the surface curve (margin avoids seams).
     const from = Math.max(0, x0 - 8);
-    const to = Math.min(WORLD_W - 1, x0 + TILE_W + 8);
+    const to = Math.min(this.width - 1, x0 + tileW + 8);
     ctx.globalCompositeOperation = 'destination-out';
     ctx.fillStyle = '#000';
     ctx.beginPath();
@@ -160,7 +166,7 @@ export class CpuTileTerrain implements TerrainView {
     const scorchR = c.r * 1.2;
     if (
       c.x + scorchR < tile.x0 ||
-      c.x - scorchR > tile.x0 + TILE_W ||
+      c.x - scorchR > tile.x0 + tile.w ||
       c.y + scorchR < tile.y0 ||
       c.y - scorchR > tile.y0 + TILE_H
     ) {

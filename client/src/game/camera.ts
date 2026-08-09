@@ -35,6 +35,7 @@ export class Camera {
 
   private vw = 1;
   private vh = 1;
+  private worldW = WORLD_W;
   private fitScale = 1;
   private scale = 1;
   private cx = WORLD_W / 2;
@@ -48,8 +49,15 @@ export class Camera {
     if (w <= 0 || h <= 0) return;
     this.vw = w;
     this.vh = h;
-    this.fitScale = w / WORLD_W;
+    this.fitScale = w / this.worldW;
     this.snapped = false; // re-snap to the new framing
+  }
+
+  /** Configured battlefield width (per match). */
+  setWorldWidth(w: number): void {
+    this.worldW = w;
+    this.fitScale = this.vw / w;
+    this.snapped = false;
   }
 
   /** Lowest tank y — the sky bias never crops within FLOOR_PAD of it. */
@@ -88,7 +96,7 @@ export class Camera {
       );
     }
     const span = this.vh / tScale;
-    const tcx = WORLD_W / 2;
+    const tcx = this.worldW / 2;
     const tcy = bottomEdge - span / 2;
 
     if (!this.snapped) {

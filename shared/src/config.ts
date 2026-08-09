@@ -5,6 +5,8 @@ import { triangular, type Rng } from './rng';
 // Everything the lobby host can tune. All gameplay code reads from a
 // MatchConfig instance rather than hardcoding these numbers.
 export const MatchConfigSchema = z.object({
+  /** Battlefield width in wu; muzzle power scales with it automatically. */
+  worldWidth: z.number().int().min(1200).max(4800).multipleOf(100).default(2400),
   startingCredits: z.number().int().min(0).max(1_000_000).default(10_000),
   startingHp: z.number().int().min(25).max(500).default(100),
   /** Credits granted at the start of every turn, win or lose. */

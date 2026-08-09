@@ -171,7 +171,7 @@ export class NetworkSession implements GameSession {
       for (const t of this.tanks) this.game.setAim(t.seat, this.aims[t.seat].angle);
       this.pushStore();
     };
-    this.game.loadRound(msg.matchSeed);
+    this.game.loadRound(msg.matchSeed, msg.config.worldWidth);
   }
 
   /** Rebuild mid-match state after a reload or reconnect. */
@@ -215,7 +215,7 @@ export class NetworkSession implements GameSession {
         useAppStore.setState({ matchPhase: 'end', winner: msg.winner, endReason: 'destroyed' });
       }
     };
-    this.game.loadRound(msg.matchSeed);
+    this.game.loadRound(msg.matchSeed, msg.config.worldWidth);
   }
 
   private onShopUpdate(msg: Extract<ServerMsg, { type: 'shop:update' }>): void {

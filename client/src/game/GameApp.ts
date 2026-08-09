@@ -80,6 +80,7 @@ export class GameApp {
   private ready = false;
   private disposed = false;
   private pendingSeed: number | null = null;
+  private pendingWorldW: number | undefined;
   private readyResolvers: (() => void)[] = [];
   private lastHostW = 0;
   private lastHostH = 0;
@@ -120,7 +121,7 @@ export class GameApp {
     if (this.pendingSeed !== null) {
       const seed = this.pendingSeed;
       this.pendingSeed = null;
-      this.loadRound(seed);
+      this.loadRound(seed, this.pendingWorldW);
     }
   }
 
@@ -130,17 +131,20 @@ export class GameApp {
   }
 
   /** Build (or rebuild) the battlefield for a seed. Safe to call pre-init. */
-  loadRound(seed: number): void {
+  loadRound(seed: number, worldW?: number): void {
     if (!this.ready) {
       this.pendingSeed = seed;
+      this.pendingWorldW = worldW;
       return;
     }
-    const gen = generateTerrain(seed);
+    const gen = generateTerrain(seed, worldW);
+    this.camera.setWorldWidth(worldW ?? gen.heights.length);
     this.mask = TerrainMask.fromHeights(gen.heights);
     this.theme = themeFor(gen.themeIndex);
 
     this.sky.setTheme(this.theme);
-    this.clouds.setTheme(this.theme);
+    this.clouds.setTheme(this.theme, gen.heights.length);
+    this.weather.setTheme(this.theme, gen.heights.length);
     this.fx.setTheme(this.theme);
 
     this.terrain?.destroy();
@@ -155,7 +159,6 @@ export class GameApp {
       this.fx.container,
       this.weather.container,
     );
-    this.weather.setTheme(this.theme);
     this.fx.onTrauma = (amount) => this.shake.add(amount);
     this.projectiles.clear();
     this.fx.clear();

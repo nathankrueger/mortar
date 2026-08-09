@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { WORLD_H, WORLD_W } from '../constants';
+import { generateTerrain } from '../terrain/generate';
 import { TerrainMask } from '../terrain/mask';
 import { WEAPONS, type WeaponId } from '../weapons';
 import { flatRange } from './ballistics';
@@ -254,6 +255,40 @@ describe('weapon behaviors', () => {
       ofType(out.events, 'fizzle').filter((f) => f.y > 0).length;
     // hop blasts + one finale per surviving warhead
     expect(resolved).toBeGreaterThanOrEqual(Math.max(5, bounces + 1));
+  });
+});
+
+describe('configurable field width', () => {
+  it('max-power range scales to roughly span any field width', () => {
+    for (const w of [1600, 2400, 3600, 4800]) {
+      const range = flatRange(45, 100, w);
+      expect(Math.abs(range - w) / w).toBeLessThan(0.01);
+    }
+  });
+
+  it('terrain generates at the configured width with proportional spawns', () => {
+    const g = generateTerrain(5, 3600);
+    expect(g.heights.length).toBe(3600);
+    expect(g.spawnX[0]).toBeGreaterThanOrEqual(360);
+    expect(g.spawnX[0]).toBeLessThanOrEqual(720);
+    expect(g.spawnX[1]).toBeGreaterThanOrEqual(2880);
+    expect(g.spawnX[1]).toBeLessThanOrEqual(3240);
+  });
+
+  it('a near-max shot crosses a massive field', () => {
+    const heights = new Float64Array(4800).fill(900);
+    const mask = TerrainMask.fromHeights(heights);
+    const tanks: SimTank[] = [
+      { seat: 0, x: 500, y: 900, hp: 100, alive: true },
+      { seat: 1, x: 4700, y: 900, hp: 100, alive: true },
+    ];
+    const out = resolveShot(
+      { mask, tanks, wind: 0, seed: 3 },
+      { seat: 0, weapon: 'mortar', angleDeg: 45, power: 92 },
+    );
+    const explode = ofType(out.events, 'explode')[0];
+    expect(explode).toBeDefined();
+    expect(explode.x).toBeGreaterThan(3900); // far side of a 4800 field
   });
 });
 

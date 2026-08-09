@@ -14,8 +14,10 @@ export class CloudLayer {
   readonly container = new Container();
   private clouds: Cloud[] = [];
   private windSign = 1;
+  private worldW = WORLD_W;
 
-  setTheme(theme: TerrainTheme): void {
+  setTheme(theme: TerrainTheme, worldW = WORLD_W): void {
+    this.worldW = worldW;
     for (const c of this.clouds) c.sprite.destroy();
     this.clouds = [];
     for (let i = 0; i < 7; i++) {
@@ -25,7 +27,7 @@ export class CloudLayer {
       sprite.alpha = theme.cloudAlpha * (0.45 + Math.random() * 0.35);
       const s = 0.7 + Math.random() * 1.1;
       sprite.scale.set(s);
-      sprite.position.set(Math.random() * WORLD_W, 90 + Math.random() * 330);
+      sprite.position.set(Math.random() * worldW, 90 + Math.random() * 330);
       this.container.addChild(sprite);
       this.clouds.push({ sprite, vx: (4 + Math.random() * 9) * (Math.random() < 0.5 ? -1 : 1) });
     }
@@ -40,8 +42,8 @@ export class CloudLayer {
     for (const c of this.clouds) {
       const dir = Math.sign(c.vx) === this.windSign ? 1 : -0.4; // drift turns slowly
       c.sprite.x += Math.abs(c.vx) * this.windSign * dtSec * (dir > 0 ? 1 : 0.4);
-      if (c.sprite.x > WORLD_W + WRAP_MARGIN) c.sprite.x = -WRAP_MARGIN;
-      if (c.sprite.x < -WRAP_MARGIN) c.sprite.x = WORLD_W + WRAP_MARGIN;
+      if (c.sprite.x > this.worldW + WRAP_MARGIN) c.sprite.x = -WRAP_MARGIN;
+      if (c.sprite.x < -WRAP_MARGIN) c.sprite.x = this.worldW + WRAP_MARGIN;
     }
   }
 }

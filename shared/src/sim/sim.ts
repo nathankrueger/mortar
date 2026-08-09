@@ -343,7 +343,7 @@ export function resolveShot(ctx: ShotContext, params: ShotParams): ShotOutcome {
 
   // ---- Fire! -------------------------------------------------------------
   const spec = weaponSpec(params.weapon);
-  const { vx, vy } = muzzleVelocity(params.angleDeg, params.power);
+  const { vx, vy } = muzzleVelocity(params.angleDeg, params.power, ctx.mask.w);
   const dirLen = Math.sqrt(vx * vx + vy * vy) || 1;
   const cx = shooter.x + (vx / dirLen) * MUZZLE_LEN;
   const cy = shooter.y - TANK_H / 2 + (vy / dirLen) * MUZZLE_LEN;

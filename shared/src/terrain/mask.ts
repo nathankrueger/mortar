@@ -85,7 +85,7 @@ export class TerrainMask {
     this.counts = counts ?? new Int32Array(w);
   }
 
-  static fromHeights(heights: ArrayLike<number>, w = WORLD_W, h = WORLD_H): TerrainMask {
+  static fromHeights(heights: ArrayLike<number>, w = heights.length, h = WORLD_H): TerrainMask {
     const mask = new TerrainMask(w, h);
     for (let x = 0; x < w; x++) {
       mask.counts[x] = Math.max(0, Math.min(h, h - Math.round(heights[x])));

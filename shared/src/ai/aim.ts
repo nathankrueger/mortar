@@ -2,7 +2,7 @@ import {
   ANGLE_MAX,
   ANGLE_MIN,
   GRAVITY,
-  MUZZLE_SPEED_PER_POWER,
+  muzzlePerPower,
   POWER_MAX,
   POWER_MIN,
   TANK_H,
@@ -106,10 +106,11 @@ function seedCandidates(ctx: AiAimContext, count: number): { angleDeg: number; p
   const dist = Math.max(60, Math.abs(dx));
   const arcs = [38, 52, 63, 74, 82].slice(0, Math.max(2, count));
   const out: { angleDeg: number; power: number }[] = [];
+  const perPower = muzzlePerPower(ctx.mask.w);
   for (const arc of arcs) {
     const rad = (arc * Math.PI) / 180;
     const v = Math.sqrt((GRAVITY * dist) / Math.max(0.2, Math.sin(2 * rad)));
-    const power = clampPower(v / MUZZLE_SPEED_PER_POWER);
+    const power = clampPower(v / perPower);
     const angle = dx >= 0 ? arc : 180 - arc;
     out.push({ angleDeg: clampAngle(angle), power });
   }

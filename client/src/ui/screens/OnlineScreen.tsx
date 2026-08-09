@@ -16,7 +16,9 @@ import {
 import { WsClient } from '../../session/wsClient';
 import { Button } from '../kit/Button';
 import { GlassPanel } from '../kit/GlassPanel';
+import { Segmented } from '../kit/Segmented';
 import { HudRoot } from '../hud/HudRoot';
+import { FUNDS_OPTIONS, WIDTH_OPTIONS } from './SoloScreen';
 
 type Stage = 'form' | 'connecting' | 'lobby' | 'game';
 export type OnlineMode = 'create' | 'join' | 'rejoin';
@@ -40,6 +42,8 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
   const [stage, setStage] = useState<Stage>('form');
   const [nickname, setNickname] = useState(() => savedNickname());
   const [codeDraft, setCodeDraft] = useState(initialCode ?? '');
+  const [worldWidth, setWorldWidth] = useState(2400);
+  const [startingCredits, setStartingCredits] = useState(10_000);
   const [error, setError] = useState<string | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
@@ -239,7 +243,12 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
       wsRef.current = ws;
       attach(ws);
       if (mode === 'create') {
-        ws.send({ type: 'room:create', v: PROTOCOL_VERSION, nickname: nick });
+        ws.send({
+          type: 'room:create',
+          v: PROTOCOL_VERSION,
+          nickname: nick,
+          config: { worldWidth, startingCredits },
+        });
       } else if (mode === 'join') {
         ws.send({
           type: 'room:join',
@@ -254,7 +263,7 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
       setError((e as Error).message);
       setStage('form');
     }
-  }, [mode, nickname, codeDraft, attach]);
+  }, [mode, nickname, codeDraft, attach, worldWidth, startingCredits]);
 
   // Rejoin mode connects immediately.
   useEffect(() => {
@@ -314,6 +323,22 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
                   onChange={(e) => setNickname(e.target.value)}
                 />
               </label>
+            )}
+            {mode === 'create' && (
+              <>
+                <Segmented
+                  label="Field width"
+                  options={WIDTH_OPTIONS}
+                  value={worldWidth}
+                  onChange={setWorldWidth}
+                />
+                <Segmented
+                  label="Starting funds"
+                  options={FUNDS_OPTIONS}
+                  value={startingCredits}
+                  onChange={setStartingCredits}
+                />
+              </>
             )}
             {mode === 'join' && (
               <label className="flex flex-col gap-1.5">

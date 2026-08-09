@@ -123,7 +123,7 @@ export class LocalSession implements GameSession {
         this.maybeRunAiLoadout();
       }
     };
-    game.loadRound(this.matchSeed);
+    game.loadRound(this.matchSeed, this.config.worldWidth);
   }
 
   // ---- Loadout ----------------------------------------------------------

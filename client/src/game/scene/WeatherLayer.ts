@@ -9,12 +9,14 @@ export class WeatherLayer {
   private kind: 'clear' | 'rain' | 'snow' = 'clear';
   private wind = 0;
   private accum = 0;
+  private worldW = WORLD_W;
 
   constructor() {
     this.container.addChild(this.system.container);
   }
 
-  setTheme(theme: TerrainTheme): void {
+  setTheme(theme: TerrainTheme, worldW = WORLD_W): void {
+    this.worldW = worldW;
     this.kind = theme.weather;
     this.system.clear();
   }
@@ -31,7 +33,7 @@ export class WeatherLayer {
         this.accum -= interval;
         const rain = this.kind === 'rain';
         this.system.burst({
-          x: Math.random() * (WORLD_W + 800) - 400,
+          x: Math.random() * (this.worldW + 800) - 400,
           y: -30,
           count: rain ? 3 : 2,
           speed: rain ? [900, 1200] : [90, 150],
