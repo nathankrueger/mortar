@@ -74,6 +74,9 @@ function DragAimLayer({ onAimBy }: { onAimBy: (dAngle: number) => void }) {
   );
 }
 
+/** Power gained per pixel of drag — geared low so exact values are easy. */
+const POWER_PER_PX = 0.3;
+
 function PowerSlider({
   power,
   onSetPower,
@@ -82,14 +85,18 @@ function PowerSlider({
   onSetPower: (power: number) => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
+  // Relative drag: grabbing never jumps the value; movement nudges it from
+  // where it was, so precise adjustments are deliberate instead of twitchy.
+  const dragRef = useRef<{ startY: number; startPower: number } | null>(null);
 
-  const setFromClientY = useCallback(
+  const onDrag = useCallback(
     (clientY: number) => {
-      const track = trackRef.current;
-      if (!track) return;
-      const rect = track.getBoundingClientRect();
-      const f = 1 - Math.min(1, Math.max(0, (clientY - rect.top) / rect.height));
-      onSetPower(Math.round(POWER_MIN + f * (POWER_MAX - POWER_MIN)));
+      const drag = dragRef.current;
+      if (!drag) return;
+      const delta = (drag.startY - clientY) * POWER_PER_PX;
+      onSetPower(
+        Math.round(Math.min(POWER_MAX, Math.max(POWER_MIN, drag.startPower + delta))),
+      );
     },
     [onSetPower],
   );
@@ -103,10 +110,16 @@ function PowerSlider({
       onPointerDown={(e) => {
         e.stopPropagation();
         e.currentTarget.setPointerCapture(e.pointerId);
-        setFromClientY(e.clientY);
+        dragRef.current = { startY: e.clientY, startPower: power };
       }}
       onPointerMove={(e) => {
-        if (e.buttons > 0 || e.pressure > 0) setFromClientY(e.clientY);
+        if (e.buttons > 0 || e.pressure > 0) onDrag(e.clientY);
+      }}
+      onPointerUp={() => {
+        dragRef.current = null;
+      }}
+      onPointerCancel={() => {
+        dragRef.current = null;
       }}
     >
       <div
