@@ -191,7 +191,6 @@ export class LocalSession implements GameSession {
     sfx.turn();
     this.game.setWind(this.wind);
     this.pushScene();
-    this.game.focusTank(seat);
     this.pushStore();
     useAppStore.setState({ shopOpen: false });
     if (this.isAiSeat(seat)) {

@@ -192,11 +192,6 @@ export class GameApp {
     this.tanks.get(seat)?.setAim(angleDeg);
   }
 
-  /** Phone camera rests on whoever is up. */
-  focusTank(seat: Seat): void {
-    const t = this.tanks.get(seat);
-    if (t) this.camera.setFocus(t.container.x, t.container.y);
-  }
 
   /** Per-turn wind: drives cloud drift and weather shear. */
   setWind(wind: number): void {

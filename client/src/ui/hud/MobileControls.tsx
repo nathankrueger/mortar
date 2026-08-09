@@ -21,14 +21,16 @@ export function MobileControls({
   return (
     <>
       <DragAimLayer onAimBy={onAimBy} />
-      <div className="pointer-events-none absolute right-[max(0.75rem,env(safe-area-inset-right))] bottom-24 flex flex-col items-center gap-4 pb-[env(safe-area-inset-bottom)]">
+      {/* Centered on the right edge so it clears the player tile above and
+          the weapon tray below, even on short landscape screens. */}
+      <div className="pointer-events-none absolute top-[55%] right-[max(0.75rem,env(safe-area-inset-right))] flex -translate-y-1/2 flex-col items-center gap-3">
         <PowerSlider power={power} onSetPower={onSetPower} />
         <button
           onPointerDown={(e) => {
             e.stopPropagation();
             onFire();
           }}
-          className="pointer-events-auto flex h-20 w-20 cursor-pointer items-center justify-center rounded-full border-2 border-red-300/50 bg-red-500/80 text-sm font-black tracking-widest text-white uppercase shadow-xl shadow-red-950/40 backdrop-blur-xl transition-transform active:scale-90"
+          className="pointer-events-auto flex h-16 w-16 cursor-pointer items-center justify-center rounded-full border-2 border-red-300/50 bg-red-500/80 text-xs font-black tracking-widest text-white uppercase shadow-xl shadow-red-950/40 backdrop-blur-xl transition-transform active:scale-90"
         >
           Fire
         </button>
@@ -97,7 +99,7 @@ function PowerSlider({
   return (
     <div
       ref={trackRef}
-      className="pointer-events-auto relative h-44 w-12 touch-none rounded-full border border-white/20 bg-black/30 backdrop-blur-xl"
+      className="pointer-events-auto relative h-[clamp(96px,32vh,176px)] w-12 touch-none rounded-full border border-white/20 bg-black/30 backdrop-blur-xl"
       onPointerDown={(e) => {
         e.stopPropagation();
         e.currentTarget.setPointerCapture(e.pointerId);
