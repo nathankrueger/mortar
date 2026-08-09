@@ -110,7 +110,9 @@ export class GameApp {
     this.app.stage.addChild(this.screenFlash);
 
     const onResize = () => {
-      const { width, height } = this.app.renderer;
+      // Logical (CSS) size — renderer.width/height are PHYSICAL pixels, and
+      // on a dpr>1 phone using those aims the camera off-screen (pure sky).
+      const { width, height } = this.app.renderer.screen;
       this.camera.setViewport(width, height);
       this.sky.resize(width, height);
       if (this.screenFlash) {
