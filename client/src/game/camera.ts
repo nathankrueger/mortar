@@ -11,6 +11,8 @@ export interface InterestBox {
 const SMOOTHING = 5.5; // spring-ish exponential smoothing rate
 /** Keep tracked shells at least this far below the top edge (wu). */
 const TRACK_MARGIN = 90;
+/** Furthest the flight zoom-out may go (fraction of the resting scale). */
+const MAX_ZOOM_OUT = 0.5;
 /**
  * When the viewport can't show the full world height (phone landscape), trade
  * up to this much deep dirt for sky so shell arcs fit without camera moves.
@@ -20,10 +22,11 @@ const SKY_BIAS_MAX = 200;
 const FLOOR_PAD = 80;
 
 /**
- * One framing, no zoom, ever: fit the battlefield width, pin the floor to the
- * bottom edge, let the sky absorb extra height. While a shot is in flight the
- * camera pans straight up just enough to keep the highest shell in frame,
- * then eases back down. Screen shake composes in as pivot offsets.
+ * Resting framing: fit the battlefield width, pin the ground to the bottom
+ * edge (with the sky-bias trade on cropped viewports). While a shot is in
+ * flight the camera never pans — it zooms out slightly, bottom still pinned,
+ * just enough to keep the highest shell in frame, then eases back in.
+ * Screen shake composes in as pivot offsets.
  */
 export class Camera {
   shakeX = 0;
@@ -64,21 +67,29 @@ export class Camera {
   }
 
   update(dtSec: number, interest: InterestBox | null): void {
-    const tScale = this.fitScale;
-    const span = this.vh / tScale;
+    const restSpan = this.vh / this.fitScale;
     // Sky bias: when height is cropped anyway, prefer cropping deep dirt so
     // more of the shell arc fits (never within FLOOR_PAD of the lowest tank).
-    const missing = Math.max(0, WORLD_H - span);
+    const missing = Math.max(0, WORLD_H - restSpan);
     const bias = Math.max(
       0,
       Math.min(missing, SKY_BIAS_MAX, WORLD_H - (this.floorY + FLOOR_PAD)),
     );
-    const bottomCy = WORLD_H - bias - span / 2;
+    const bottomEdge = WORLD_H - bias;
+
+    let tScale = this.fitScale;
+    if (interest) {
+      // Zoom out (never pan) just enough that the highest shell fits.
+      const restTop = bottomEdge - restSpan;
+      const neededTop = Math.min(restTop, interest.y0 - TRACK_MARGIN);
+      tScale = Math.max(
+        this.fitScale * MAX_ZOOM_OUT,
+        Math.min(this.fitScale, this.vh / (bottomEdge - neededTop)),
+      );
+    }
+    const span = this.vh / tScale;
     const tcx = WORLD_W / 2;
-    // Pan up only as far as needed to keep the highest shell in frame.
-    const tcy = interest
-      ? Math.min(bottomCy, interest.y0 + span / 2 - TRACK_MARGIN)
-      : bottomCy;
+    const tcy = bottomEdge - span / 2;
 
     if (!this.snapped) {
       this.scale = tScale;
@@ -87,7 +98,10 @@ export class Camera {
       this.snapped = true;
     } else {
       const a = 1 - Math.exp(-dtSec * SMOOTHING);
-      this.scale += (tScale - this.scale) * a;
+      // Zoom out fast enough to stay ahead of a rising shell; ease back
+      // in gently once it's falling.
+      const aScale = 1 - Math.exp(-dtSec * (tScale < this.scale ? 16 : 3));
+      this.scale += (tScale - this.scale) * aScale;
       this.cx += (tcx - this.cx) * a;
       this.cy += (tcy - this.cy) * a;
     }
