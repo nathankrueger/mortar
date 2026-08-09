@@ -141,9 +141,15 @@ export function HudRoot({
               <span className="text-white/30">|</span>
               <span>⚡ {aim.power.toFixed(0)}</span>
             </div>
-            <span className="hidden text-xs text-white/40 sm:block">
-              {aiTurn ? `${seats[turnSeat].nickname} is aiming…` : 'space to fire · esc to exit'}
-            </span>
+            {aiTurn ? (
+              <span className="text-xs text-white/40">{seats[turnSeat].nickname} is aiming…</span>
+            ) : (
+              !IS_COARSE_POINTER && (
+                <span className="hidden text-xs text-white/40 sm:block">
+                  space to fire · esc for menu
+                </span>
+              )
+            )}
           </div>
         </div>
       )}
