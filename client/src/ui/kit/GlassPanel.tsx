@@ -8,7 +8,7 @@ export function GlassPanel({
 }: { children: ReactNode; className?: string } & HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={`rounded-3xl border border-white/15 bg-white/10 shadow-2xl shadow-black/40 backdrop-blur-2xl ${className}`}
+      className={`rounded-3xl border border-white/20 bg-slate-900/45 shadow-2xl shadow-black/40 backdrop-blur-2xl ${className}`}
       {...rest}
     >
       {children}

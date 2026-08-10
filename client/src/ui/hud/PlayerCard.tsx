@@ -19,8 +19,8 @@ export function PlayerCard({
     <div
       className={`flex min-w-40 flex-col gap-1.5 rounded-2xl border px-4 py-3 backdrop-blur-xl transition-all duration-300 ${
         active
-          ? 'border-white/30 bg-white/15 shadow-lg shadow-black/30'
-          : 'border-white/10 bg-black/20 opacity-75'
+          ? 'border-white/35 bg-slate-900/55 shadow-lg shadow-black/30'
+          : 'border-white/10 bg-slate-900/35 opacity-75'
       }`}
     >
       <div className="flex items-center gap-2">

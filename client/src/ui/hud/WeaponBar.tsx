@@ -71,7 +71,7 @@ export function WeaponBar({
             className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold backdrop-blur-xl transition-all duration-150 ${
               active
                 ? 'border-white/60 bg-white/90 text-ink shadow-lg'
-                : 'border-white/15 bg-black/25 text-white/85 hover:bg-black/40'
+                : 'border-white/15 bg-slate-900/50 text-white/85 hover:bg-black/40'
             }`}
             title={spec.blurb}
           >

@@ -77,7 +77,7 @@ export function HudRoot({
           <button
             onClick={() => setMenuOpen(true)}
             aria-label="Menu"
-            className="pointer-events-auto mt-0.5 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-black/25 text-white/85 backdrop-blur-xl transition-all hover:bg-black/40 active:scale-95"
+            className="pointer-events-auto mt-0.5 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-slate-900/50 text-white/85 backdrop-blur-xl transition-all hover:bg-black/40 active:scale-95"
           >
             <span className="text-lg leading-none">≡</span>
           </button>
@@ -91,7 +91,7 @@ export function HudRoot({
         <div className="mt-1 flex flex-col items-center gap-2">
           <WindPill wind={wind} />
           {phase === 'resolving' && (
-            <div className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/50 backdrop-blur-xl">
+            <div className="rounded-full border border-white/10 bg-slate-900/45 px-3 py-1 text-xs text-white/50 backdrop-blur-xl">
               {WEAPONS[weapon].name} away…
             </div>
           )}
@@ -111,7 +111,7 @@ export function HudRoot({
           className="turn-banner absolute top-24 left-1/2 -translate-x-1/2"
         >
           <span
-            className={`text-2xl font-bold tracking-tight drop-shadow-lg ${SEAT_TEXT[turnSeat]}`}
+            className={`rounded-full bg-slate-900/50 px-5 py-1.5 text-2xl font-bold tracking-tight backdrop-blur-xl ${SEAT_TEXT[turnSeat]}`}
           >
             {seats[turnSeat].nickname}
           </span>
@@ -136,7 +136,7 @@ export function HudRoot({
                 Shop
               </button>
             )}
-            <div className="flex items-center gap-3 rounded-full border border-white/15 bg-black/25 px-4 py-2 font-mono text-sm text-white/90 backdrop-blur-xl">
+            <div className="flex items-center gap-3 rounded-full border border-white/15 bg-slate-900/45 px-4 py-2 font-mono text-sm text-white/90 backdrop-blur-xl">
               <span>∠ {aim.angle.toFixed(0)}°</span>
               <span className="text-white/30">|</span>
               <span>⚡ {aim.power.toFixed(0)}</span>
@@ -156,7 +156,7 @@ export function HudRoot({
 
       {/* Pre-match loadout */}
       {phase === 'loadout' && loadoutSeat !== null && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/25 backdrop-blur-[2px]">
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-900/50 backdrop-blur-[2px]">
           {mySeat !== null && loadoutDone[loadoutSeat] ? (
             <GlassPanel className="flex items-center gap-3 px-8 py-6">
               <span className="text-sm text-white/70">Loadout locked — waiting for opponent…</span>
@@ -184,7 +184,7 @@ export function HudRoot({
 
       {/* In-turn shop — only on your own turn, only your own wallet. */}
       {shopOpen && myTurn && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/25 backdrop-blur-[2px]">
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-900/50 backdrop-blur-[2px]">
           <ShopPanel
             title={`${seats[shopSeat].nickname} — battlefield shop`}
             accentClass={SEAT_TEXT[shopSeat]}

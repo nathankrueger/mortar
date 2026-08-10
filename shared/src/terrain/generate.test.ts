@@ -73,6 +73,30 @@ describe('generateTerrain', () => {
     }
   });
 
+  it('generates cosmetic side aprons that join the edges smoothly', () => {
+    for (const seed of [2, 11, 99]) {
+      const g = generateTerrain(seed);
+      expect(g.apronLeft.length).toBe(WORLD_W / 2);
+      expect(g.apronRight.length).toBe(WORLD_W / 2);
+      // Index 0 hugs the world edge — continuity within a couple texels.
+      expect(Math.abs(g.apronLeft[0] - g.heights[0])).toBeLessThan(2);
+      expect(Math.abs(g.apronRight[0] - g.heights[WORLD_W - 1])).toBeLessThan(2);
+      for (const arr of [g.apronLeft, g.apronRight]) {
+        for (let i = 0; i < arr.length; i += 37) {
+          expect(arr[i]).toBeGreaterThanOrEqual(0.3 * WORLD_H - 1e-9);
+          expect(arr[i]).toBeLessThanOrEqual(0.95 * WORLD_H + 1e-9);
+        }
+      }
+    }
+  });
+
+  it('aprons do not disturb the playfield RNG (same heights as before)', () => {
+    const a = generateTerrain(1234);
+    const b = generateTerrain(1234);
+    expect([...a.heights]).toEqual([...b.heights]);
+    expect([...a.apronLeft]).toEqual([...b.apronLeft]);
+  });
+
   it('hits every macro feature across seeds', () => {
     const seen = new Set<string>();
     for (let seed = 0; seed < 60; seed++) seen.add(generateTerrain(seed).macro);

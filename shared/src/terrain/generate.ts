@@ -24,12 +24,19 @@ export type MacroFeature = 'rolling' | 'plateau' | 'twin-peaks' | 'canyon';
 const MACRO_FEATURES: readonly MacroFeature[] = ['rolling', 'plateau', 'twin-peaks', 'canyon'];
 
 export interface GeneratedTerrain {
-  /** Surface y per column (length WORLD_W). Smaller y = higher ground. */
+  /** Surface y per column (length worldW). Smaller y = higher ground. */
   heights: Float64Array;
   /** Spawn x for seat 0 (left) and seat 1 (right). */
   spawnX: [number, number];
   macro: MacroFeature;
   themeIndex: number;
+  /**
+   * Cosmetic side extensions so zoomed-out framing never shows bare sky.
+   * Renderer-only — the sim world still ends at [0, worldW). Index 0 is the
+   * column adjacent to the world edge, increasing outward.
+   */
+  apronLeft: Float64Array;
+  apronRight: Float64Array;
 }
 
 function smoothstep(t: number): number {
@@ -105,7 +112,28 @@ export function generateTerrain(seed: number, worldW = WORLD_W): GeneratedTerrai
     heights[x] = clamp(y, SURFACE_MIN, SURFACE_MAX);
   }
 
-  // 4) Flatten a landing shelf at each spawn so tanks start level.
+  // 4) Cosmetic aprons past both edges (drawn after all gameplay rolls so
+  //    earlier RNG consumption — and therefore the playfield — is unchanged).
+  const apronW = Math.round(w / 2);
+  const mkApron = (edgeH: number): Float64Array => {
+    const arr = new Float64Array(apronW);
+    const n = new Float64Array(apronW);
+    let a = 1;
+    let ampSum = 0;
+    for (let o = 0; o < 3; o++) {
+      addOctave(rng, n, 160 / (1 << o), a);
+      ampSum += a;
+      a *= PERSISTENCE;
+    }
+    for (let i = 0; i < apronW; i++) {
+      const wild = BASE_LEVEL - (n[i] / ampSum - 0.5) * 2 * NOISE_AMPLITUDE * 1.15;
+      const t = smoothstep(Math.min(1, i / 220));
+      arr[i] = clamp(edgeH * (1 - t) + wild * t, 0.3 * WORLD_H, 0.95 * WORLD_H);
+    }
+    return arr;
+  };
+
+  // 5) Flatten a landing shelf at each spawn so tanks start level.
   for (const sx of [spawn0, spawn1]) {
     const shelfY = heights[clamp(sx, 0, w - 1)];
     const from = Math.max(0, sx - SPAWN_SHELF_HALF - SPAWN_BLEND);
@@ -121,5 +149,12 @@ export function generateTerrain(seed: number, worldW = WORLD_W): GeneratedTerrai
     }
   }
 
-  return { heights, spawnX: [spawn0, spawn1], macro, themeIndex };
+  return {
+    heights,
+    spawnX: [spawn0, spawn1],
+    macro,
+    themeIndex,
+    apronLeft: mkApron(heights[0]),
+    apronRight: mkApron(heights[w - 1]),
+  };
 }

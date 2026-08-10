@@ -108,7 +108,7 @@ function PowerSlider({
   return (
     <div
       ref={trackRef}
-      className="pointer-events-auto relative h-[clamp(96px,32vh,176px)] w-12 touch-none rounded-full border border-white/20 bg-black/30 backdrop-blur-xl"
+      className="pointer-events-auto relative h-[clamp(96px,32vh,176px)] w-12 touch-none rounded-full border border-white/20 bg-slate-900/55 backdrop-blur-xl"
       onPointerDown={(e) => {
         e.stopPropagation();
         e.currentTarget.setPointerCapture(e.pointerId);

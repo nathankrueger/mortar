@@ -13,9 +13,14 @@ import { Container, Sprite, Texture } from 'pixi.js';
  * Renderer-side terrain. Must stay column-faithful to the shared TerrainMask:
  * it mirrors the same carve/mound circles into its own surface model.
  */
+export interface TerrainAprons {
+  left: Float64Array;
+  right: Float64Array;
+}
+
 export interface TerrainView {
   readonly container: Container;
-  init(heights: Float64Array, theme: TerrainTheme): void;
+  init(heights: Float64Array, theme: TerrainTheme, aprons?: TerrainAprons): void;
   applyCarves(circles: readonly CarveCircle[]): void;
   destroy(): void;
 }
@@ -42,19 +47,24 @@ interface Tile {
 export class CpuTileTerrain implements TerrainView {
   readonly container = new Container();
   private tiles: Tile[] = [];
+  private apronSprites: Sprite[] = [];
   private surfaces: Float64Array = new Float64Array(WORLD_W);
   private width = WORLD_W;
   private cols = 0;
   private theme: TerrainTheme | null = null;
   private noise: CanvasPattern | null = null;
 
-  init(heights: Float64Array, theme: TerrainTheme): void {
+  init(heights: Float64Array, theme: TerrainTheme, aprons?: TerrainAprons): void {
     this.disposeTiles();
     this.surfaces = Float64Array.from(heights);
     this.width = heights.length;
     this.cols = Math.ceil(this.width / TILE_W);
     this.theme = theme;
     this.noise = makeNoisePattern();
+    if (aprons) {
+      this.paintApron(aprons.left, 'left');
+      this.paintApron(aprons.right, 'right');
+    }
 
     for (let row = 0; row < ROWS; row++) {
       for (let col = 0; col < this.cols; col++) {
@@ -162,6 +172,60 @@ export class CpuTileTerrain implements TerrainView {
     ctx.restore();
   }
 
+  /**
+   * Decorative hills past the world edge, drawn once at half resolution so
+   * zoomed-out framing never shows bare sky. arr[0] hugs the edge.
+   */
+  private paintApron(arr: Float64Array, side: 'left' | 'right'): void {
+    const theme = this.theme;
+    if (!theme || arr.length === 0) return;
+    const A = arr.length;
+    const cw = Math.ceil(A / 2);
+    const ch = Math.ceil(WORLD_H / 2);
+    const canvas = document.createElement('canvas');
+    canvas.width = cw;
+    canvas.height = ch;
+    const ctx = canvas.getContext('2d')!;
+
+    // Canvas x → apron index (left apron is mirrored: outward = leftward).
+    const idxAt = (cx: number) =>
+      Math.min(A - 1, Math.max(0, side === 'left' ? A - 1 - cx * 2 : cx * 2));
+
+    const g = ctx.createLinearGradient(0, 0.19 * WORLD_H, 0, ch);
+    g.addColorStop(0, cssColor(theme.soilTop));
+    g.addColorStop(1, cssColor(theme.soilDeep));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, cw, ch);
+    if (this.noise) {
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = this.noise;
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.globalAlpha = 1;
+    }
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.moveTo(-2, -10);
+    for (let cx = 0; cx < cw; cx++) ctx.lineTo(cx, arr[idxAt(cx)] / 2);
+    ctx.lineTo(cw + 2, -10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.beginPath();
+    ctx.moveTo(0, arr[idxAt(0)] / 2 + 1.5);
+    for (let cx = 0; cx < cw; cx++) ctx.lineTo(cx, arr[idxAt(cx)] / 2 + 1.5);
+    ctx.strokeStyle = cssColor(theme.grass);
+    ctx.lineWidth = 3.5;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    const sprite = new Sprite(Texture.from(canvas));
+    sprite.scale.set(2);
+    sprite.position.set(side === 'left' ? -A : this.width, 0);
+    this.container.addChild(sprite);
+    this.apronSprites.push(sprite);
+  }
+
   private scorch(tile: Tile, c: CarveCircle): void {
     const scorchR = c.r * 1.2;
     if (
@@ -193,6 +257,12 @@ export class CpuTileTerrain implements TerrainView {
       if (tile.texture !== Texture.EMPTY) tile.texture.destroy(true);
     }
     this.tiles = [];
+    for (const s of this.apronSprites) {
+      const tex = s.texture;
+      s.destroy();
+      tex.destroy(true);
+    }
+    this.apronSprites = [];
   }
 
   destroy(): void {

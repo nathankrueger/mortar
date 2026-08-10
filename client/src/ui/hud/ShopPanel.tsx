@@ -49,7 +49,7 @@ export function ShopPanel({
             <div
               key={id}
               title={spec.blurb}
-              className="flex flex-col justify-between gap-1.5 rounded-xl border border-white/10 bg-black/25 p-2.5"
+              className="flex flex-col justify-between gap-1.5 rounded-xl border border-white/10 bg-slate-900/50 p-2.5"
             >
               <div>
                 <div className="flex items-center justify-between gap-1">
