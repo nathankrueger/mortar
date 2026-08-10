@@ -473,6 +473,102 @@ export class Room {
     this.broadcast({ type: 'room:closed', reason: 'expired' });
     for (const s of this.seats) s?.ws?.close();
   }
+
+  // ---- persistence across server restarts --------------------------------
+  // Rooms are tiny; serializing them lets a deploy/restart look like a brief
+  // network blip — clients auto-rejoin by token and get a snapshot.
+
+  toJSON(): unknown {
+    return {
+      code: this.code,
+      config: this.config,
+      phase: this.phase,
+      turnSeat: this.turnSeat,
+      turnNumber: this.turnNumber,
+      matchSeed: this.matchSeed,
+      firstSeat: this.firstSeat,
+      wind: this.wind,
+      shotSeed: this.shotSeed,
+      winner: this.winner,
+      carves: this.carves,
+      seats: this.seats.map((s) =>
+        s
+          ? {
+              nickname: s.nickname,
+              token: s.token,
+              lobbyReady: s.lobbyReady,
+              loadoutDone: s.loadoutDone,
+              credits: s.credits,
+              inventory: s.inventory,
+              hp: s.hp,
+              alive: s.alive,
+              fallY: s.fallY,
+            }
+          : null,
+      ),
+    };
+  }
+
+  static fromJSON(data: ReturnType<Room['toJSON']>): Room {
+    const d = data as Room & { seats: (SeatState | null)[] };
+    const room = new Room(d.code, d.config);
+    room.phase = d.phase;
+    room.turnSeat = d.turnSeat;
+    room.turnNumber = d.turnNumber;
+    room.matchSeed = d.matchSeed;
+    room.firstSeat = d.firstSeat;
+    room.wind = d.wind;
+    room.shotSeed = d.shotSeed;
+    room.winner = d.winner;
+    room.carves = d.carves ?? [];
+    room.seats = d.seats.map((s) =>
+      s
+        ? {
+            ws: null,
+            nickname: s.nickname,
+            token: s.token,
+            lobbyReady: s.lobbyReady,
+            loadoutDone: s.loadoutDone,
+            credits: s.credits,
+            inventory: s.inventory,
+            hp: s.hp,
+            alive: s.alive,
+            rematchVote: false,
+            lastAimAt: 0,
+            fallY: s.fallY,
+          }
+        : null,
+    );
+    room.scheduleRestoreTimers();
+    return room;
+  }
+
+  /** After a restore nobody is connected; restart the lifecycle timers. */
+  private scheduleRestoreTimers(): void {
+    // A restart mid-resolution lost the next-turn timer: advance shortly.
+    if (this.phase === 'resolving') {
+      this.nextTurnTimer = setTimeout(() => {
+        this.nextTurnTimer = null;
+        const dead = this.seats.filter((x) => x && !x.alive).length;
+        if (dead > 0) {
+          this.endMatch(dead === 2 ? null : this.seats[0]!.alive ? 0 : 1, 'destroyed');
+        } else {
+          this.beginTurn((1 - this.turnSeat) as Seat);
+        }
+      }, 5_000);
+    }
+    // Players who never come back forfeit as usual.
+    if (this.phase === 'turn' || this.phase === 'resolving') {
+      for (const [i, s] of this.seats.entries()) {
+        if (!s) continue;
+        setTimeout(() => {
+          if (this.phase !== 'ended' && this.seats[i] && this.seats[i]!.ws === null) {
+            this.forfeit(i as Seat);
+          }
+        }, 180_000);
+      }
+    }
+  }
 }
 
 export { PROTOCOL_VERSION };

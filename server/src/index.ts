@@ -36,6 +36,27 @@ const serveStatic = clientDist
   : null;
 
 const rooms = new RoomManager();
+const ROOMS_FILE = path.resolve(process.cwd(), 'rooms.json');
+{
+  const restored = rooms.restoreFrom(ROOMS_FILE);
+  if (restored > 0) console.log(`restored ${restored} room(s) — players can rejoin seamlessly`);
+}
+
+// Persist live rooms on shutdown so deploys don't kill matches.
+let shuttingDown = false;
+const shutdown = () => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  try {
+    const saved = rooms.saveTo(ROOMS_FILE);
+    if (saved > 0) console.log(`saved ${saved} room(s) for restart`);
+  } catch {
+    /* best effort */
+  }
+  process.exit(0);
+};
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
 
 const server = http.createServer((req, res) => {
   if (req.url === '/healthz') {

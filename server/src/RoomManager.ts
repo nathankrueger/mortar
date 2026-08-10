@@ -1,3 +1,4 @@
+import { readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { Room } from './Room';
 
 // Room codes avoid vowels and lookalikes: no accidental words, no 0/O 1/I.
@@ -35,6 +36,32 @@ export class RoomManager {
 
   get count(): number {
     return this.rooms.size;
+  }
+
+  /** Persist every non-empty room so a restart looks like a network blip. */
+  saveTo(path: string): number {
+    const data = [...this.rooms.values()]
+      .filter((r) => r.seats.some((s) => s !== null))
+      .map((r) => r.toJSON());
+    writeFileSync(path, JSON.stringify(data));
+    return data.length;
+  }
+
+  /** Restore rooms saved by a previous process; consumes the file. */
+  restoreFrom(path: string): number {
+    let restored = 0;
+    try {
+      const raw = readFileSync(path, 'utf8');
+      unlinkSync(path);
+      for (const entry of JSON.parse(raw) as unknown[]) {
+        const room = Room.fromJSON(entry as never);
+        this.rooms.set(room.code, room);
+        restored++;
+      }
+    } catch {
+      /* no file / unreadable — fresh start */
+    }
+    return restored;
   }
 
   private sweep(): void {

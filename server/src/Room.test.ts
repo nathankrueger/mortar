@@ -236,6 +236,81 @@ describe('Room', () => {
     expect(winnerSock.last('room:closed')).toEqual({ type: 'room:closed', reason: 'opponentLeft' });
   });
 
+  it('survives a server restart: serialize, restore, rejoin by old token', () => {
+    const { room, a, b } = setupLobby();
+    startMatch(room, a, b);
+    room.handleMsg(0, { type: 'shop:buy', weapon: 'smallNuke', qty: 1 });
+    const turn = a.last('turn:begin')!;
+    // Land a real carve so terrain state exists.
+    const gen = generateTerrain(room.matchSeed, room.config.worldWidth);
+    const mask = TerrainMask.fromHeights(gen.heights);
+    const tanks: SimTank[] = gen.spawnX.map((x, i) => ({
+      seat: i as 0 | 1,
+      x,
+      y: Math.round(gen.heights[x]),
+      hp: room.config.startingHp,
+      alive: true,
+    }));
+    const out = resolveShot(
+      { mask, tanks, wind: turn.wind, seed: turn.shotSeed },
+      { seat: turn.seat, weapon: 'mortar', angleDeg: turn.seat === 0 ? 45 : 135, power: 70 },
+    );
+    room.handleMsg(turn.seat, {
+      type: 'shot:fire',
+      weapon: 'mortar',
+      angleDeci: 450,
+      power: 70,
+      events: out.events as never,
+      ticks: Math.max(1, out.ticks),
+    });
+    vi.advanceTimersByTime((out.ticks / 120) * 1000 + 2500); // next turn begins
+
+    const token0 = (room as unknown as { seats: { token: string }[] }).seats[0].token;
+    const json = JSON.parse(JSON.stringify(room.toJSON())); // through-disk round trip
+    const restored = Room.fromJSON(json);
+
+    expect(restored.phase).toBe('turn');
+    expect(restored.turnNumber).toBe(room.turnNumber);
+    expect(restored.carves.length).toBe(room.carves.length);
+    expect(restored.matchSeed).toBe(room.matchSeed);
+
+    // The old rejoin token still opens the door and yields a full snapshot.
+    const back = new FakeSocket();
+    expect(restored.rejoin(asWs(back), token0)).toBe(0);
+    restored.sendSnapshot(0);
+    const snap = back.last('room:snapshot')!;
+    expect(snap.matchSeed).toBe(room.matchSeed);
+    expect(snap.hp).toEqual([
+      (room as unknown as { seats: { hp: number }[] }).seats[0].hp,
+      (room as unknown as { seats: { hp: number }[] }).seats[1].hp,
+    ]);
+    expect(snap.carves.length).toBe(room.carves.length);
+  });
+
+  it('a restart mid-resolution still advances to the next turn', () => {
+    const { room, a, b } = setupLobby();
+    startMatch(room, a, b);
+    const turn = a.last('turn:begin')!;
+    room.handleMsg(turn.seat, {
+      type: 'shot:fire',
+      weapon: 'mortar',
+      angleDeci: 450,
+      power: 40,
+      events: [] as never,
+      ticks: 600,
+    });
+    // Restart before the playback timer fires.
+    const restored = Room.fromJSON(JSON.parse(JSON.stringify(room.toJSON())) as never);
+    const back = new FakeSocket();
+    const token = (room as unknown as { seats: { token: string }[] }).seats[0].token;
+    restored.rejoin(asWs(back), token);
+    expect(restored.phase).toBe('resolving');
+    vi.advanceTimersByTime(6_000);
+    expect(back.last('turn:begin')).toBeDefined();
+    expect(restored.phase).toBe('turn');
+    void b;
+  });
+
   it('lobby disconnect holds the seat (ready flag intact) through a grace window', () => {
     const { room, a, b } = setupLobby();
     room.handleMsg(1, { type: 'lobby:ready', ready: true });
