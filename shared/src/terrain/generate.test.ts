@@ -24,6 +24,7 @@ describe('generateTerrain', () => {
     expect(a.spawnX).toEqual(b.spawnX);
     expect(a.macro).toBe(b.macro);
     expect(a.themeIndex).toBe(b.themeIndex);
+    expect(a.trees).toEqual(b.trees);
   });
 
   it('different seeds produce different terrain', () => {
@@ -101,5 +102,37 @@ describe('generateTerrain', () => {
     const seen = new Set<string>();
     for (let seed = 0; seed < 60; seed++) seen.add(generateTerrain(seed).macro);
     expect(seen.size).toBe(4);
+  });
+});
+
+describe('tree cover', () => {
+  it('plants small trees in swaths on most maps', () => {
+    let mapsWithTrees = 0;
+    for (let seed = 0; seed < 20; seed++) {
+      const { trees, spawnX } = generateTerrain(seed);
+      if (trees.length === 0) continue;
+      mapsWithTrees++;
+      for (const t of trees) {
+        expect(t.h).toBeGreaterThan(8);
+        expect(t.h).toBeLessThan(45);
+        expect(Math.abs(t.x - spawnX[0])).toBeGreaterThan(60);
+        expect(Math.abs(t.x - spawnX[1])).toBeGreaterThan(60);
+      }
+    }
+    expect(mapsWithTrees).toBeGreaterThan(10);
+  });
+
+  it('leaves bare stretches — trees cluster instead of carpeting', () => {
+    let sawGap = 0;
+    for (let seed = 0; seed < 20; seed++) {
+      const { trees, heights } = generateTerrain(seed);
+      if (trees.length < 5) continue;
+      let maxGap = 0;
+      for (let i = 1; i < trees.length; i++) {
+        maxGap = Math.max(maxGap, trees[i].x - trees[i - 1].x);
+      }
+      if (maxGap > 0.1 * heights.length) sawGap++;
+    }
+    expect(sawGap).toBeGreaterThan(5);
   });
 });

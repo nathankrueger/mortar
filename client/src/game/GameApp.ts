@@ -178,10 +178,12 @@ export class GameApp {
 
     this.terrain?.destroy();
     this.terrain = new CpuTileTerrain();
-    this.terrain.init(gen.heights, this.theme, {
-      left: gen.apronLeft,
-      right: gen.apronRight,
-    });
+    this.terrain.init(
+      gen.heights,
+      this.theme,
+      { left: gen.apronLeft, right: gen.apronRight },
+      gen.trees,
+    );
 
     // Rebuild layer order above the clouds.
     this.worldRoot.addChild(

@@ -7,6 +7,7 @@ import {
   type CarveCircle,
   type EdgeSurfaces,
   type TerrainTheme,
+  type TerrainTree,
 } from '@mortar/shared';
 import { Container, Sprite, Texture } from 'pixi.js';
 
@@ -21,7 +22,12 @@ export interface TerrainAprons {
 
 export interface TerrainView {
   readonly container: Container;
-  init(heights: Float64Array, theme: TerrainTheme, aprons?: TerrainAprons): void;
+  init(
+    heights: Float64Array,
+    theme: TerrainTheme,
+    aprons?: TerrainAprons,
+    trees?: readonly TerrainTree[],
+  ): void;
   applyCarves(circles: readonly CarveCircle[]): void;
   destroy(): void;
 }
@@ -58,13 +64,21 @@ export class CpuTileTerrain implements TerrainView {
   private noise: CanvasPattern | null = null;
   /** Fixed wall heights at the world edges (apron index 0) for settling. */
   private edges: EdgeSurfaces | undefined;
+  /** Living scenery trees; blasts prune them, survivors ride the surface. */
+  private trees: TerrainTree[] = [];
 
-  init(heights: Float64Array, theme: TerrainTheme, aprons?: TerrainAprons): void {
+  init(
+    heights: Float64Array,
+    theme: TerrainTheme,
+    aprons?: TerrainAprons,
+    trees?: readonly TerrainTree[],
+  ): void {
     this.disposeTiles();
     this.surfaces = Float64Array.from(heights);
     this.width = heights.length;
     this.cols = Math.ceil(this.width / TILE_W);
     this.theme = theme;
+    this.trees = trees ? [...trees] : [];
     this.noise = makeNoisePattern();
     this.edges = aprons
       ? {
@@ -109,6 +123,10 @@ export class CpuTileTerrain implements TerrainView {
     if (!this.theme) return;
     const dirtyCols = new Set<number>();
     const scorches: CarveCircle[] = [];
+    // Blasts clear the woods around ground zero (mounds just bury trunks).
+    for (const c of circles) {
+      if (!c.add) this.trees = this.trees.filter((t) => Math.abs(t.x - c.x) > c.r * 0.9);
+    }
     for (const c of circles) {
       const range = c.add
         ? moundSurfaceCircle(this.surfaces, WORLD_H, c.x, c.r, this.edges)
@@ -185,7 +203,44 @@ export class CpuTileTerrain implements TerrainView {
     ctx.lineCap = 'round';
     ctx.stroke();
 
+    // 5) Trees rooted in this tile's column span (crowns may overhang the
+    //    row above/below — every row draws them, the clip sorts it out).
+    for (const t of this.trees) {
+      if (t.x >= x0 - 30 && t.x <= x0 + tileW + 30) this.drawTree(ctx, theme, t);
+    }
+
     ctx.restore();
+  }
+
+  /** Tiny scenery tree standing on the surface at its column. */
+  private drawTree(ctx: CanvasRenderingContext2D, theme: TerrainTheme, t: TerrainTree): void {
+    const xi = Math.min(this.width - 1, Math.max(0, Math.round(t.x)));
+    const base = this.surfaces[xi] + 2;
+    const h = t.h;
+    ctx.fillStyle = cssColor(shade(theme.soilDeep, 0.72));
+    ctx.fillRect(t.x - 1.1, base - h * 0.4, 2.2, h * 0.4);
+    ctx.fillStyle = cssColor(shade(theme.grass, t.kind === 1 ? 0.52 : 0.64));
+    if (t.kind === 2) {
+      // Round crown: a clump of overlapping blobs.
+      ctx.beginPath();
+      ctx.arc(t.x, base - h * 0.62, h * 0.3, 0, Math.PI * 2);
+      ctx.arc(t.x - h * 0.18, base - h * 0.48, h * 0.22, 0, Math.PI * 2);
+      ctx.arc(t.x + h * 0.18, base - h * 0.5, h * 0.24, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // Conifer: stacked triangles, slimmer for kind 1.
+      const wHalf = h * (t.kind === 1 ? 0.2 : 0.28);
+      for (let layer = 0; layer < 3; layer++) {
+        const ly = base - h * (0.3 + 0.23 * layer);
+        const lw = wHalf * (1 - layer * 0.26);
+        ctx.beginPath();
+        ctx.moveTo(t.x - lw, ly);
+        ctx.lineTo(t.x + lw, ly);
+        ctx.lineTo(t.x, ly - h * 0.34);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
   }
 
   /**
@@ -293,6 +348,14 @@ export class CpuTileTerrain implements TerrainView {
     this.disposeTiles();
     this.container.destroy();
   }
+}
+
+/** Multiply an 0xRRGGBB color's channels by f (0..1 darkens). */
+function shade(c: number, f: number): number {
+  const r = Math.min(255, Math.round(((c >> 16) & 0xff) * f));
+  const g = Math.min(255, Math.round(((c >> 8) & 0xff) * f));
+  const b = Math.min(255, Math.round((c & 0xff) * f));
+  return (r << 16) | (g << 8) | b;
 }
 
 let noisePattern: CanvasPattern | null | undefined;

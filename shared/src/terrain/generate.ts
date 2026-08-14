@@ -23,6 +23,18 @@ const SPAWN_BLEND = 24; // extra margin blending shelf back into terrain
 export type MacroFeature = 'rolling' | 'plateau' | 'twin-peaks' | 'canyon';
 const MACRO_FEATURES: readonly MacroFeature[] = ['rolling', 'plateau', 'twin-peaks', 'canyon'];
 
+const SALT_TREES = 0x7e33;
+
+/** One cosmetic tree planted on the surface (renderer-only). */
+export interface TerrainTree {
+  /** Base x (wu); the tree stands on the surface column here. */
+  x: number;
+  /** Height (wu) — deliberately small scenery, not obstacles. */
+  h: number;
+  /** Sprite variant: 0/1 = conifer silhouettes, 2 = round crown. */
+  kind: number;
+}
+
 export interface GeneratedTerrain {
   /** Surface y per column (length worldW). Smaller y = higher ground. */
   heights: Float64Array;
@@ -37,6 +49,12 @@ export interface GeneratedTerrain {
    */
   apronLeft: Float64Array;
   apronRight: Float64Array;
+  /**
+   * Cosmetic tree cover. A low-frequency density field splits the map into
+   * forest swaths and bare stretches, so whole hillsides read wooded or
+   * barren instead of uniform sprinkling. Renderer-only.
+   */
+  trees: TerrainTree[];
 }
 
 function smoothstep(t: number): number {
@@ -83,6 +101,29 @@ function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
 }
 
+/** Rounded headroom at the height limits (wu). */
+const CLAMP_KNEE = 0.08 * WORLD_H;
+
+/**
+ * Compress surface y into the allowed band with soft knees: instead of
+ * clipping tall peaks (and deep valleys) into dead-flat mesas, the last
+ * CLAMP_KNEE wu squash asymptotically, so extreme terrain rounds off and
+ * keeps its noise texture.
+ */
+function softClamp(y: number): number {
+  const topKnee = SURFACE_MIN + CLAMP_KNEE;
+  if (y < topKnee) {
+    const e = topKnee - y;
+    return topKnee - (CLAMP_KNEE * e) / (e + CLAMP_KNEE);
+  }
+  const botKnee = SURFACE_MAX - CLAMP_KNEE;
+  if (y > botKnee) {
+    const e = y - botKnee;
+    return botKnee + (CLAMP_KNEE * e) / (e + CLAMP_KNEE);
+  }
+  return y;
+}
+
 export function generateTerrain(seed: number, worldW = WORLD_W): GeneratedTerrain {
   const rng = mulberry32(deriveSeed(seed, SALT_TERRAIN));
   const w = worldW;
@@ -109,7 +150,7 @@ export function generateTerrain(seed: number, worldW = WORLD_W): GeneratedTerrai
   for (let x = 0; x < w; x++) {
     const n = noise[x] / ampSum; // ~[0,1]
     const y = BASE_LEVEL - (n - 0.5) * 2 * NOISE_AMPLITUDE - macroOffset(macro, x, w);
-    heights[x] = clamp(y, SURFACE_MIN, SURFACE_MAX);
+    heights[x] = softClamp(y);
   }
 
   // 4) Cosmetic aprons past both edges (drawn after all gameplay rolls so
@@ -149,6 +190,42 @@ export function generateTerrain(seed: number, worldW = WORLD_W): GeneratedTerrai
     }
   }
 
+  // 6) Tree cover from its own child seed (the playfield rolls above are
+  //    untouched). Density noise > threshold = forest swath; flats only,
+  //    clear of both spawns.
+  const trees: TerrainTree[] = [];
+  {
+    const trng = mulberry32(deriveSeed(seed, SALT_TREES));
+    const density = new Float64Array(w);
+    let ta = 1;
+    let tSum = 0;
+    for (let o = 0; o < 2; o++) {
+      addOctave(trng, density, 520 / (1 << o), ta);
+      tSum += ta;
+      ta *= 0.45;
+    }
+    // Rolled per map: some worlds come out lush, others nearly barren.
+    const threshold = randRange(trng, 0.42, 0.62);
+    let x = 10;
+    while (x < w - 10) {
+      const d = density[x] / tSum;
+      const slope = Math.abs(
+        heights[clamp(x + 5, 0, w - 1)] - heights[clamp(x - 5, 0, w - 1)],
+      );
+      const nearSpawn = Math.abs(x - spawn0) < 70 || Math.abs(x - spawn1) < 70;
+      if (d > threshold && slope < 16 && !nearSpawn) {
+        trees.push({
+          x: x + randRange(trng, -3, 3),
+          h: randRange(trng, 14, 26) * (0.85 + (d - threshold) * 0.9),
+          kind: randInt(trng, 0, 2),
+        });
+        x += Math.round(randRange(trng, 15, 40));
+      } else {
+        x += 9;
+      }
+    }
+  }
+
   return {
     heights,
     spawnX: [spawn0, spawn1],
@@ -156,5 +233,6 @@ export function generateTerrain(seed: number, worldW = WORLD_W): GeneratedTerrai
     themeIndex,
     apronLeft: mkApron(heights[0]),
     apronRight: mkApron(heights[w - 1]),
+    trees,
   };
 }
