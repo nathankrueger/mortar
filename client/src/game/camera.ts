@@ -36,6 +36,7 @@ export class Camera {
   private vw = 1;
   private vh = 1;
   private worldW = WORLD_W;
+  private hudInsetR = 0;
   private fitScale = 1;
   private scale = 1;
   private cx = WORLD_W / 2;
@@ -49,15 +50,39 @@ export class Camera {
     if (w <= 0 || h <= 0) return;
     this.vw = w;
     this.vh = h;
-    this.fitScale = w / this.worldW;
-    this.snapped = false; // re-snap to the new framing
+    this.refit();
   }
 
   /** Configured battlefield width (per match). */
   setWorldWidth(w: number): void {
     this.worldW = w;
-    this.fitScale = this.vw / w;
-    this.snapped = false;
+    this.refit();
+  }
+
+  /**
+   * Screen px on the right kept clear of the battlefield so tanks never sit
+   * behind the touch HUD column (power slider + fire). The apron terrain
+   * fills the reserved strip past the world edge.
+   */
+  setRightInset(px: number): void {
+    if (px === this.hudInsetR) return;
+    this.hudInsetR = px;
+    this.refit();
+  }
+
+  /** Viewport width actually available to the battlefield. */
+  private get usableW(): number {
+    return this.vw - Math.min(this.hudInsetR, this.vw * 0.25);
+  }
+
+  /** Screen x the battlefield centers on (left of vw/2 when a HUD inset is set). */
+  private get screenCX(): number {
+    return this.usableW / 2;
+  }
+
+  private refit(): void {
+    this.fitScale = this.usableW / this.worldW;
+    this.snapped = false; // re-snap to the new framing
   }
 
   /** Lowest tank y — the sky bias never crops within FLOOR_PAD of it. */
@@ -67,7 +92,7 @@ export class Camera {
 
   /** World x of the screen's left edge — used for parallax layers. */
   get worldLeft(): number {
-    return this.cx - this.vw / this.scale / 2;
+    return this.cx - this.screenCX / this.scale;
   }
 
   get currentScale(): number {
@@ -115,7 +140,7 @@ export class Camera {
     }
 
     this.root.pivot.set(this.cx, this.cy);
-    this.root.position.set(this.vw / 2 + this.shakeX, this.vh / 2 + this.shakeY);
+    this.root.position.set(this.screenCX + this.shakeX, this.vh / 2 + this.shakeY);
     this.root.scale.set(this.scale);
     this.root.rotation = this.shakeRot;
   }
@@ -123,7 +148,7 @@ export class Camera {
   /** Screen → world for pointer input. */
   toWorld(sx: number, sy: number): { x: number; y: number } {
     return {
-      x: this.cx + (sx - this.vw / 2) / this.scale,
+      x: this.cx + (sx - this.screenCX) / this.scale,
       y: this.cy + (sy - this.vh / 2) / this.scale,
     };
   }

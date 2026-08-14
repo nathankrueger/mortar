@@ -28,6 +28,8 @@ export interface TerrainView {
 const TILE_W = 300;
 const TILE_H = 450;
 const ROWS = WORLD_H / TILE_H; // 3
+/** World px each apron extends inward, under the edge tiles (even number). */
+const APRON_OVERLAP = 8;
 
 interface Tile {
   canvas: HTMLCanvasElement;
@@ -147,14 +149,19 @@ export class CpuTileTerrain implements TerrainView {
     }
 
     // 3) Cut away everything above the surface curve (margin avoids seams).
+    // The ±2 side extensions matter at the world edges: a polygon ending
+    // exactly on the last column leaves it unerased — a full-height soil
+    // line hanging in the sky right at the wall.
     const from = Math.max(0, x0 - 8);
     const to = Math.min(this.width - 1, x0 + tileW + 8);
     ctx.globalCompositeOperation = 'destination-out';
     ctx.fillStyle = '#000';
     ctx.beginPath();
-    ctx.moveTo(from, -10);
+    ctx.moveTo(from - 2, -10);
+    ctx.lineTo(from - 2, this.surfaces[from]);
     for (let x = from; x <= to; x++) ctx.lineTo(x, this.surfaces[x]);
-    ctx.lineTo(to, -10);
+    ctx.lineTo(to + 2, this.surfaces[to]);
+    ctx.lineTo(to + 2, -10);
     ctx.closePath();
     ctx.fill();
 
@@ -174,13 +181,15 @@ export class CpuTileTerrain implements TerrainView {
 
   /**
    * Decorative hills past the world edge, drawn once at half resolution so
-   * zoomed-out framing never shows bare sky. arr[0] hugs the edge.
+   * zoomed-out framing never shows bare sky. arr[0] hugs the edge. The apron
+   * tucks APRON_OVERLAP px under the edge tiles (tiles paint on top): abutting
+   * exactly leaves a hairline of sky at the seam at fractional zoom scales.
    */
   private paintApron(arr: Float64Array, side: 'left' | 'right'): void {
     const theme = this.theme;
     if (!theme || arr.length === 0) return;
     const A = arr.length;
-    const cw = Math.ceil(A / 2);
+    const cw = Math.ceil(A / 2) + APRON_OVERLAP / 2;
     const ch = Math.ceil(WORLD_H / 2);
     const canvas = document.createElement('canvas');
     canvas.width = cw;
@@ -188,8 +197,9 @@ export class CpuTileTerrain implements TerrainView {
     const ctx = canvas.getContext('2d')!;
 
     // Canvas x → apron index (left apron is mirrored: outward = leftward).
+    // The overlap strip clamps to arr[0], the height at the world edge.
     const idxAt = (cx: number) =>
-      Math.min(A - 1, Math.max(0, side === 'left' ? A - 1 - cx * 2 : cx * 2));
+      Math.min(A - 1, Math.max(0, side === 'left' ? A - 1 - cx * 2 : cx * 2 - APRON_OVERLAP));
 
     const g = ctx.createLinearGradient(0, 0.19 * WORLD_H, 0, ch);
     g.addColorStop(0, cssColor(theme.soilTop));
@@ -221,7 +231,7 @@ export class CpuTileTerrain implements TerrainView {
 
     const sprite = new Sprite(Texture.from(canvas));
     sprite.scale.set(2);
-    sprite.position.set(side === 'left' ? -A : this.width, 0);
+    sprite.position.set(side === 'left' ? -A : this.width - APRON_OVERLAP, 0);
     this.container.addChild(sprite);
     this.apronSprites.push(sprite);
   }

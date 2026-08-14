@@ -1,5 +1,5 @@
 import { WEAPON_ORDER, WEAPONS, type WeaponId } from '@mortar/shared';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { sfx } from '../../audio/sfx';
 
 const KEY_LABELS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '='];
@@ -37,6 +37,33 @@ export function WeaponBar({
 }) {
   const visible = WEAPON_ORDER.filter((id) => available(id, counts));
 
+  // Compact mode scrolls horizontally; fade the clipped edges so chips melt
+  // away instead of cutting hard. Each side fades only while it's clipping.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [clip, setClip] = useState({ left: false, right: false });
+  const updateClip = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const left = el.scrollLeft > 2;
+    const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
+    setClip((c) => (c.left === left && c.right === right ? c : { left, right }));
+  }, []);
+
+  useEffect(() => {
+    if (!compact || !scrollRef.current) return;
+    updateClip();
+    const ro = new ResizeObserver(updateClip);
+    ro.observe(scrollRef.current);
+    return () => ro.disconnect();
+  }, [compact, updateClip, visible.length]);
+
+  const fadeMask =
+    clip.left || clip.right
+      ? `linear-gradient(to right, ${clip.left ? 'transparent, black 2.5rem' : 'black'}, ${
+          clip.right ? 'black calc(100% - 2.5rem), transparent' : 'black'
+        })`
+      : undefined;
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const idx = KEY_CODES.indexOf(e.code);
@@ -51,9 +78,12 @@ export function WeaponBar({
 
   return (
     <div
+      ref={scrollRef}
+      onScroll={compact ? updateClip : undefined}
+      style={compact ? { maskImage: fadeMask, WebkitMaskImage: fadeMask } : undefined}
       className={
         compact
-          ? 'pointer-events-auto flex max-w-[62vw] items-center gap-1.5 overflow-x-auto py-1'
+          ? 'pointer-events-auto flex max-w-[80vw] items-center gap-1.5 overflow-x-auto px-1 py-1 [scrollbar-width:none]'
           : 'pointer-events-auto flex max-w-[95vw] flex-wrap items-center justify-center gap-1.5'
       }
     >

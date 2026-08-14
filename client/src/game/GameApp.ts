@@ -10,6 +10,7 @@ import {
 } from '@mortar/shared';
 import { WEAPONS, type WeaponId } from '@mortar/shared';
 import { Application, Container, Sprite, Texture } from 'pixi.js';
+import { touchHudRightReserve } from '../app/platform';
 import { sfx } from '../audio/sfx';
 import { Camera, type InterestBox } from './camera';
 import { ShotPlayback, type PlaybackDelegate } from './playback';
@@ -304,6 +305,7 @@ export class GameApp {
     // on a dpr>1 phone using those aims the camera off-screen (pure sky).
     const { width, height } = this.app.renderer.screen;
     this.camera.setViewport(width, height);
+    this.camera.setRightInset(touchHudRightReserve());
     this.sky.resize(width, height);
     if (this.screenFlash) {
       this.screenFlash.width = width;
