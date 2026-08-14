@@ -43,13 +43,13 @@ describe('generateTerrain', () => {
     }
   });
 
-  it('places spawns 10–20% in from each side', () => {
+  it('places spawns 5–15% in from each side', () => {
     for (let seed = 0; seed < 50; seed++) {
       const { spawnX } = generateTerrain(seed);
-      expect(spawnX[0]).toBeGreaterThanOrEqual(0.1 * WORLD_W);
-      expect(spawnX[0]).toBeLessThanOrEqual(0.2 * WORLD_W);
-      expect(spawnX[1]).toBeGreaterThanOrEqual(0.8 * WORLD_W);
-      expect(spawnX[1]).toBeLessThanOrEqual(0.9 * WORLD_W);
+      expect(spawnX[0]).toBeGreaterThanOrEqual(0.05 * WORLD_W);
+      expect(spawnX[0]).toBeLessThanOrEqual(0.15 * WORLD_W);
+      expect(spawnX[1]).toBeGreaterThanOrEqual(0.85 * WORLD_W);
+      expect(spawnX[1]).toBeLessThanOrEqual(0.95 * WORLD_W);
     }
   });
 

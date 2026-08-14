@@ -40,10 +40,10 @@ function safeAreaInsetRight(): number {
 /**
  * Screen px the camera keeps clear of the battlefield's right edge so tanks
  * never hide behind the touch HUD column. Mirrors MobileControls' layout:
- * the column hugs the wall at max(0.5rem, half the safe-area inset) and its
- * widest widget (the fire button) is 64px, plus a little breathing room.
+ * the column hugs the wall at max(0.25rem, a quarter of the safe-area inset)
+ * and its widest widget (the fire button) is 64px, plus breathing room.
  */
 export function touchHudRightReserve(): number {
   if (!IS_COARSE_POINTER) return 0;
-  return Math.max(8, safeAreaInsetRight() / 2) + 72;
+  return Math.max(4, safeAreaInsetRight() / 4) + 72;
 }

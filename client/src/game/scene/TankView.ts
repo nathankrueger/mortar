@@ -1,9 +1,7 @@
-import type { Seat } from '@mortar/shared';
+import type { Seat, TankColor } from '@mortar/shared';
 import { Container, Graphics } from 'pixi.js';
 
 const DEG2RAD = Math.PI / 180;
-const SEAT_COLORS: [number, number] = [0x4f9cf9, 0xff7a59];
-const SEAT_DEEP: [number, number] = [0x2f6fd4, 0xd94f2f];
 
 /**
  * Minimal rounded-geometry tank: body + dome + pivoting barrel.
@@ -16,9 +14,12 @@ export class TankView {
   private dead = false;
   private fallTween: { from: number; to: number; t: number; dur: number } | null = null;
 
-  constructor(readonly seat: Seat) {
-    const color = SEAT_COLORS[seat];
-    const deep = SEAT_DEEP[seat];
+  constructor(
+    readonly seat: Seat,
+    livery: TankColor,
+  ) {
+    const color = livery.main;
+    const deep = livery.deep;
 
     this.barrel
       .roundRect(0, -3, 27, 6, 3)

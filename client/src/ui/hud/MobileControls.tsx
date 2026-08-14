@@ -23,10 +23,10 @@ export function MobileControls({
       <DragAimLayer onAimBy={onAimBy} />
       {/* Centered on the right edge so it clears the player tile above and
           the weapon tray below, even on short landscape screens. Hugs the
-          wall — only half the safe-area inset, which these fat rounded
-          widgets tolerate — and the camera reserves this strip so tanks
-          never sit behind it (platform.touchHudRightReserve). */}
-      <div className="pointer-events-none absolute top-[55%] right-[max(0.5rem,calc(env(safe-area-inset-right)/2))] flex -translate-y-1/2 flex-col items-center gap-3">
+          wall — only a quarter of the safe-area inset, which these fat
+          rounded widgets tolerate — and the camera reserves this strip so
+          tanks never sit behind it (platform.touchHudRightReserve). */}
+      <div className="pointer-events-none absolute top-[55%] right-[max(0.25rem,calc(env(safe-area-inset-right)/4))] flex -translate-y-1/2 flex-col items-center gap-3">
         <PowerSlider power={power} onSetPower={onSetPower} />
         <button
           onPointerDown={(e) => {

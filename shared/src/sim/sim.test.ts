@@ -269,10 +269,10 @@ describe('configurable field width', () => {
   it('terrain generates at the configured width with proportional spawns', () => {
     const g = generateTerrain(5, 3600);
     expect(g.heights.length).toBe(3600);
-    expect(g.spawnX[0]).toBeGreaterThanOrEqual(360);
-    expect(g.spawnX[0]).toBeLessThanOrEqual(720);
-    expect(g.spawnX[1]).toBeGreaterThanOrEqual(2880);
-    expect(g.spawnX[1]).toBeLessThanOrEqual(3240);
+    expect(g.spawnX[0]).toBeGreaterThanOrEqual(180);
+    expect(g.spawnX[0]).toBeLessThanOrEqual(540);
+    expect(g.spawnX[1]).toBeGreaterThanOrEqual(3060);
+    expect(g.spawnX[1]).toBeLessThanOrEqual(3420);
   });
 
   it('a near-max shot crosses a massive field', () => {

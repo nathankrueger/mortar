@@ -1,11 +1,15 @@
 import {
+  cssColor,
   generateTerrain,
+  seatColorsForSeed,
+  TANK_PALETTE,
   TerrainMask,
   themeFor,
   type CarveCircle,
   type ProjectileKind,
   type Seat,
   type SimEvent,
+  type TankColor,
   type TerrainTheme,
 } from '@mortar/shared';
 import { WEAPONS, type WeaponId } from '@mortar/shared';
@@ -72,6 +76,7 @@ export class GameApp {
 
   private tankLayer = new Container();
   private tanks = new Map<Seat, TankView>();
+  private seatColors: [TankColor, TankColor] = [TANK_PALETTE[0], TANK_PALETTE[1]];
   private playback: ShotPlayback | null = null;
   private screenFlash: Sprite | null = null;
   private projHot = new Map<number, boolean>();
@@ -143,6 +148,15 @@ export class GameApp {
     this.mask = TerrainMask.fromHeights(gen.heights);
     this.theme = themeFor(gen.themeIndex);
 
+    // Per-match liveries: tanks get them directly; the HUD follows for free
+    // because its p1/p2 utility classes resolve through these theme vars.
+    this.seatColors = seatColorsForSeed(seed);
+    const rootStyle = document.documentElement.style;
+    rootStyle.setProperty('--color-p1', cssColor(this.seatColors[0].main));
+    rootStyle.setProperty('--color-p1-deep', cssColor(this.seatColors[0].deep));
+    rootStyle.setProperty('--color-p2', cssColor(this.seatColors[1].main));
+    rootStyle.setProperty('--color-p2-deep', cssColor(this.seatColors[1].deep));
+
     this.sky.setTheme(this.theme);
     this.clouds.setTheme(this.theme, gen.heights.length);
     this.weather.setTheme(this.theme, gen.heights.length);
@@ -188,7 +202,7 @@ export class GameApp {
     for (const s of states) {
       let view = this.tanks.get(s.seat);
       if (!view) {
-        view = new TankView(s.seat);
+        view = new TankView(s.seat, this.seatColors[s.seat]);
         this.tankLayer.addChild(view.container);
         this.tanks.set(s.seat, view);
       }

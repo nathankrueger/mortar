@@ -1,4 +1,5 @@
 export * from './constants';
+export * from './colors';
 export * from './config';
 export * from './rng';
 export * from './terrain/generate';

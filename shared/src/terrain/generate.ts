@@ -100,8 +100,8 @@ export function generateTerrain(seed: number, worldW = WORLD_W): GeneratedTerrai
 
   // 2) Macro landform + spawn slots + theme (rolled after noise, fixed order).
   const macro = MACRO_FEATURES[randInt(rng, 0, MACRO_FEATURES.length - 1)];
-  const spawn0 = Math.round(randRange(rng, 0.1, 0.2) * w);
-  const spawn1 = Math.round(randRange(rng, 0.8, 0.9) * w);
+  const spawn0 = Math.round(randRange(rng, 0.05, 0.15) * w);
+  const spawn1 = Math.round(randRange(rng, 0.85, 0.95) * w);
   const themeIndex = randInt(rng, 0, THEMES.length - 1);
 
   // 3) Compose surface heights.
