@@ -2,6 +2,7 @@ import {
   AI_PROFILES,
   resolveConfig,
   type AiDifficulty,
+  type ColorPick,
   type MatchConfig,
   type Seat,
   type WeaponId,
@@ -22,10 +23,13 @@ export function HotseatScreen({
   sandbox = false,
   ai,
   config,
+  colorPicks,
 }: {
   sandbox?: boolean;
   ai?: { seat: Seat; difficulty: AiDifficulty };
   config?: Partial<MatchConfig>;
+  /** Requested tank colors per seat (null = random each match). */
+  colorPicks?: [ColorPick, ColorPick];
 }) {
   const [runId, setRunId] = useState(0);
   const sessionRef = useRef<LocalSession | null>(null);
@@ -47,6 +51,7 @@ export function HotseatScreen({
       session = new LocalSession(game, randomSeed(), resolveConfig(config), nicknames, {
         sandbox,
         ai,
+        colorPicks,
       });
       sessionRef.current = session;
       session.start();

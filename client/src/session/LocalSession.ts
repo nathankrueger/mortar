@@ -19,6 +19,7 @@ import {
   shotEarnings,
   TerrainMask,
   type AiDifficulty,
+  type ColorPick,
   type Inventory,
   type MatchConfig,
   type Seat,
@@ -38,6 +39,8 @@ interface AimState {
 export interface LocalSessionOptions {
   sandbox?: boolean;
   ai?: { seat: Seat; difficulty: AiDifficulty };
+  /** Requested tank colors per seat (null = random each match). */
+  colorPicks?: [ColorPick, ColorPick];
 }
 
 const WIND_SALT = 0x51a7;
@@ -123,6 +126,7 @@ export class LocalSession implements GameSession {
         this.maybeRunAiLoadout();
       }
     };
+    game.setColorPicks(this.options.colorPicks ?? [null, null]);
     game.loadRound(this.matchSeed, this.config.worldWidth);
   }
 

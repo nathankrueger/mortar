@@ -1,4 +1,4 @@
-import type { Seat } from '@mortar/shared';
+import { TANK_PALETTE, type Seat } from '@mortar/shared';
 
 const KEY = 'mortar.rejoin';
 const MAX_AGE_MS = 35 * 60 * 1000; // matches server room TTL
@@ -37,6 +37,25 @@ export function loadRejoin(): RejoinInfo | null {
 export function clearRejoin(): void {
   try {
     localStorage.removeItem(KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+const COLOR_KEY = 'mortar.tankColor';
+export function savedColorPick(): number | null {
+  try {
+    const raw = localStorage.getItem(COLOR_KEY);
+    if (raw === null || raw === '') return null;
+    const n = Number(raw);
+    return Number.isInteger(n) && n >= 0 && n < TANK_PALETTE.length ? n : null;
+  } catch {
+    return null;
+  }
+}
+export function saveColorPick(c: number | null): void {
+  try {
+    localStorage.setItem(COLOR_KEY, c === null ? '' : String(c));
   } catch {
     /* ignore */
   }

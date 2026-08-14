@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TANK_PALETTE } from '../colors';
 import { MatchConfigSchema } from '../config';
 import { WEAPONS, type WeaponId } from '../weapons';
 
@@ -19,6 +20,15 @@ const code = z
 const token = z.string().length(32);
 const angleDeci = z.number().int().min(20).max(1780);
 const power = z.number().int().min(5).max(100);
+/** Palette index the player wants for their tank; null/absent = random. */
+const colorPickValue = z
+  .number()
+  .int()
+  .min(0)
+  .max(TANK_PALETTE.length - 1)
+  .nullable();
+const colorPick = colorPickValue.optional();
+const colorPicks = z.tuple([colorPickValue, colorPickValue]);
 
 // ---- Sim events (validated verbatim; produced by the shooter's engine) ----
 
@@ -113,9 +123,10 @@ export const ClientMsgSchema = z.discriminatedUnion('type', [
     type: z.literal('room:create'),
     v: z.number().int(),
     nickname,
+    color: colorPick,
     config: MatchConfigSchema.partial().optional(),
   }),
-  z.object({ type: z.literal('room:join'), v: z.number().int(), code, nickname }),
+  z.object({ type: z.literal('room:join'), v: z.number().int(), code, nickname, color: colorPick }),
   z.object({ type: z.literal('room:rejoin'), v: z.number().int(), code, token }),
   z.object({ type: z.literal('room:leave') }),
   z.object({ type: z.literal('lobby:ready'), ready: z.boolean() }),
@@ -171,6 +182,8 @@ export const ServerMsgSchema = z.discriminatedUnion('type', [
     config: MatchConfigSchema,
     firstSeat: seat,
     nicknames: z.tuple([nickname, nickname]),
+    /** Each seat's requested color (null = random); resolved client-side with the seed. */
+    colors: colorPicks,
   }),
   z.object({
     type: z.literal('shop:update'),
@@ -212,6 +225,7 @@ export const ServerMsgSchema = z.discriminatedUnion('type', [
     matchSeed: z.number().int(),
     firstSeat: seat,
     nicknames: z.tuple([nickname, nickname]),
+    colors: colorPicks,
     turnSeat: seat,
     turnNumber: z.number().int(),
     wind: z.number(),

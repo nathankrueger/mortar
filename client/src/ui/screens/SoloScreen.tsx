@@ -1,7 +1,9 @@
-import { AI_PROFILES, type AiDifficulty, type MatchConfig } from '@mortar/shared';
+import { AI_PROFILES, type AiDifficulty, type ColorPick, type MatchConfig } from '@mortar/shared';
 import { useState } from 'react';
 import { navigate } from '../../app/routes';
+import { saveColorPick, savedColorPick } from '../../session/rejoinStorage';
 import { Button } from '../kit/Button';
+import { ColorPicker } from '../kit/ColorPicker';
 import { GlassPanel } from '../kit/GlassPanel';
 import { Segmented } from '../kit/Segmented';
 import { HotseatScreen } from './HotseatScreen';
@@ -30,10 +32,18 @@ export function SoloScreen() {
   const [difficulty, setDifficulty] = useState<AiDifficulty | null>(null);
   const [worldWidth, setWorldWidth] = useState(2400);
   const [startingCredits, setStartingCredits] = useState(10_000);
+  const [color, setColor] = useState<ColorPick>(() => savedColorPick());
 
   if (difficulty) {
     const config: Partial<MatchConfig> = { worldWidth, startingCredits };
-    return <HotseatScreen key={difficulty} ai={{ seat: 1, difficulty }} config={config} />;
+    return (
+      <HotseatScreen
+        key={difficulty}
+        ai={{ seat: 1, difficulty }}
+        config={config}
+        colorPicks={[color, null]}
+      />
+    );
   }
 
   return (
@@ -46,6 +56,13 @@ export function SoloScreen() {
           options={FUNDS_OPTIONS}
           value={startingCredits}
           onChange={setStartingCredits}
+        />
+        <ColorPicker
+          value={color}
+          onChange={(c) => {
+            setColor(c);
+            saveColorPick(c);
+          }}
         />
         <p className="mt-1 text-center text-sm text-white/60">Pick your opponent.</p>
         {(['easy', 'medium', 'hard'] as const).map((d) => (

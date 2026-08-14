@@ -171,6 +171,7 @@ export class NetworkSession implements GameSession {
       for (const t of this.tanks) this.game.setAim(t.seat, this.aims[t.seat].angle);
       this.pushStore();
     };
+    this.game.setColorPicks(msg.colors);
     this.game.loadRound(msg.matchSeed, msg.config.worldWidth);
   }
 
@@ -215,6 +216,7 @@ export class NetworkSession implements GameSession {
         useAppStore.setState({ matchPhase: 'end', winner: msg.winner, endReason: 'destroyed' });
       }
     };
+    this.game.setColorPicks(msg.colors);
     this.game.loadRound(msg.matchSeed, msg.config.worldWidth);
   }
 

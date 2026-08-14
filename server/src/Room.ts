@@ -24,6 +24,8 @@ import type { WebSocket } from 'ws';
 interface SeatState {
   ws: WebSocket | null;
   nickname: string;
+  /** Requested tank color (palette index); null = random each match. */
+  colorPick: number | null;
   token: string;
   lobbyReady: boolean;
   loadoutDone: boolean;
@@ -70,13 +72,18 @@ export class Room {
 
   // ---- membership -------------------------------------------------------
 
-  addPlayer(ws: WebSocket, nickname: string): { seat: Seat; token: string } | 'full' {
+  addPlayer(
+    ws: WebSocket,
+    nickname: string,
+    colorPick: number | null = null,
+  ): { seat: Seat; token: string } | 'full' {
     const idx = this.seats.findIndex((s) => s === null);
     if (idx === -1 || this.phase !== 'lobby') return 'full';
     const token = randomBytes(16).toString('hex');
     this.seats[idx] = {
       ws,
       nickname,
+      colorPick,
       token,
       lobbyReady: false,
       loadoutDone: false,
@@ -155,6 +162,7 @@ export class Room {
       matchSeed: this.matchSeed,
       firstSeat: this.firstSeat,
       nicknames: [this.seats[0]!.nickname, this.seats[1]!.nickname],
+      colors: [this.seats[0]!.colorPick, this.seats[1]!.colorPick],
       turnSeat: this.turnSeat,
       turnNumber: this.turnNumber,
       wind: this.wind,
@@ -291,6 +299,7 @@ export class Room {
       config: this.config,
       firstSeat: this.firstSeat,
       nicknames: [this.seats[0]!.nickname, this.seats[1]!.nickname],
+      colors: [this.seats[0]!.colorPick, this.seats[1]!.colorPick],
     });
     this.broadcastShop();
   }
@@ -495,6 +504,7 @@ export class Room {
         s
           ? {
               nickname: s.nickname,
+              colorPick: s.colorPick,
               token: s.token,
               lobbyReady: s.lobbyReady,
               loadoutDone: s.loadoutDone,
@@ -526,6 +536,7 @@ export class Room {
         ? {
             ws: null,
             nickname: s.nickname,
+            colorPick: s.colorPick ?? null,
             token: s.token,
             lobbyReady: s.lobbyReady,
             loadoutDone: s.loadoutDone,

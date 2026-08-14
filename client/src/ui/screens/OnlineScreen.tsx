@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION, type ServerMsg } from '@mortar/shared';
+import { PROTOCOL_VERSION, type ColorPick, type ServerMsg } from '@mortar/shared';
 import QRCode from 'qrcode';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { navigate } from '../../app/routes';
@@ -9,12 +9,15 @@ import { NetworkSession } from '../../session/NetworkSession';
 import {
   clearRejoin,
   loadRejoin,
+  saveColorPick,
+  savedColorPick,
   savedNickname,
   saveNickname,
   saveRejoin,
 } from '../../session/rejoinStorage';
 import { WsClient } from '../../session/wsClient';
 import { Button } from '../kit/Button';
+import { ColorPicker } from '../kit/ColorPicker';
 import { GlassPanel } from '../kit/GlassPanel';
 import { Segmented } from '../kit/Segmented';
 import { HudRoot } from '../hud/HudRoot';
@@ -41,6 +44,7 @@ const STALE_MS = 35_000;
 export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialCode?: string }) {
   const [stage, setStage] = useState<Stage>('form');
   const [nickname, setNickname] = useState(() => savedNickname());
+  const [color, setColor] = useState<ColorPick>(() => savedColorPick());
   const [codeDraft, setCodeDraft] = useState(initialCode ?? '');
   const [worldWidth, setWorldWidth] = useState(2400);
   const [startingCredits, setStartingCredits] = useState(10_000);
@@ -247,6 +251,7 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
           type: 'room:create',
           v: PROTOCOL_VERSION,
           nickname: nick,
+          color,
           config: { worldWidth, startingCredits },
         });
       } else if (mode === 'join') {
@@ -255,6 +260,7 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
           v: PROTOCOL_VERSION,
           code: codeDraft.trim().toUpperCase(),
           nickname: nick,
+          color,
         });
       } else {
         ws.send({ type: 'room:rejoin', v: PROTOCOL_VERSION, code: info!.code, token: info!.token });
@@ -263,7 +269,7 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
       setError((e as Error).message);
       setStage('form');
     }
-  }, [mode, nickname, codeDraft, attach, worldWidth, startingCredits]);
+  }, [mode, nickname, color, codeDraft, attach, worldWidth, startingCredits]);
 
   // Rejoin mode connects immediately.
   useEffect(() => {
@@ -323,6 +329,15 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
                   onChange={(e) => setNickname(e.target.value)}
                 />
               </label>
+            )}
+            {mode !== 'rejoin' && (
+              <ColorPicker
+                value={color}
+                onChange={(c) => {
+                  setColor(c);
+                  saveColorPick(c);
+                }}
+              />
             )}
             {mode === 'create' && (
               <>

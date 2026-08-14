@@ -1,11 +1,12 @@
 import {
   cssColor,
   generateTerrain,
-  seatColorsForSeed,
+  resolveSeatColors,
   TANK_PALETTE,
   TerrainMask,
   themeFor,
   type CarveCircle,
+  type ColorPick,
   type ProjectileKind,
   type Seat,
   type SimEvent,
@@ -77,6 +78,7 @@ export class GameApp {
   private tankLayer = new Container();
   private tanks = new Map<Seat, TankView>();
   private seatColors: [TankColor, TankColor] = [TANK_PALETTE[0], TANK_PALETTE[1]];
+  private colorPicks: [ColorPick, ColorPick] = [null, null];
   private playback: ShotPlayback | null = null;
   private screenFlash: Sprite | null = null;
   private projHot = new Map<number, boolean>();
@@ -136,6 +138,14 @@ export class GameApp {
     return new Promise((resolve) => this.readyResolvers.push(resolve));
   }
 
+  /**
+   * Requested tank colors per seat (null = random). Set before loadRound;
+   * sticks for every subsequent round so rematches keep explicit picks.
+   */
+  setColorPicks(picks: [ColorPick, ColorPick]): void {
+    this.colorPicks = picks;
+  }
+
   /** Build (or rebuild) the battlefield for a seed. Safe to call pre-init. */
   loadRound(seed: number, worldW?: number): void {
     if (!this.ready) {
@@ -150,7 +160,7 @@ export class GameApp {
 
     // Per-match liveries: tanks get them directly; the HUD follows for free
     // because its p1/p2 utility classes resolve through these theme vars.
-    this.seatColors = seatColorsForSeed(seed);
+    this.seatColors = resolveSeatColors(seed, this.colorPicks);
     const rootStyle = document.documentElement.style;
     rootStyle.setProperty('--color-p1', cssColor(this.seatColors[0].main));
     rootStyle.setProperty('--color-p1-deep', cssColor(this.seatColors[0].deep));

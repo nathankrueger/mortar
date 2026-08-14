@@ -48,7 +48,7 @@ export function handleConnection(ws: WebSocket, rooms: RoomManager): void {
       }
       if (msg.type === 'room:create') {
         const room = rooms.create(msg.config);
-        const res = room.addPlayer(ws, msg.nickname);
+        const res = room.addPlayer(ws, msg.nickname, msg.color ?? null);
         if (res === 'full') {
           sendErr('ROOM_FULL', 'room is full');
           return;
@@ -71,7 +71,7 @@ export function handleConnection(ws: WebSocket, rooms: RoomManager): void {
           sendErr('ROOM_NOT_FOUND', `no room ${msg.code}`);
           return;
         }
-        const res = room.addPlayer(ws, msg.nickname);
+        const res = room.addPlayer(ws, msg.nickname, msg.color ?? null);
         if (res === 'full') {
           sendErr('ROOM_FULL', 'room already has two players');
           return;
