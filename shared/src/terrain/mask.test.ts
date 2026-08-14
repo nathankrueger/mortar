@@ -160,3 +160,25 @@ describe('carveSurfaceCircle (renderer mirror)', () => {
     expect(carveSurfaceCircle(surfaces, 100, 50, 20, 15)).toBeNull();
   });
 });
+
+describe('edge carves and aprons', () => {
+  it('the apron re-anchors on a carved edge instead of standing as a wall', () => {
+    const w = 400;
+    const h = 600;
+    const surface = 300;
+    const heights = new Float64Array(w).fill(surface);
+    const apron = new Float64Array(220).fill(surface);
+    const mask = TerrainMask.fromHeights(heights, w, h, { left: apron, right: apron });
+    mask.carveCircle(w - 1, surface, 60); // blast centered on the right edge
+    const edge = mask.surfaceYAt(w - 1);
+    expect(edge).toBeGreaterThan(surface + 20); // the crater actually dug in
+    // Just outside the world the apron now starts at the carved edge height…
+    expect(Math.abs(mask.surfaceYAt(w) - edge)).toBeLessThanOrEqual(2);
+    // …descends smoothly (no step over the repose scale anywhere in the blend)…
+    for (let i = 0; i < 200; i++) {
+      expect(Math.abs(mask.surfaceYAt(w + i + 1) - mask.surfaceYAt(w + i))).toBeLessThan(9);
+    }
+    // …and returns to the original scenery further out.
+    expect(mask.surfaceYAt(w + 219)).toBe(surface);
+  });
+});

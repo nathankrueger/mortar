@@ -1,11 +1,11 @@
 import {
+  blendApron,
   carveSurfaceCircle,
   cssColor,
   moundSurfaceCircle,
   WORLD_H,
   WORLD_W,
   type CarveCircle,
-  type EdgeSurfaces,
   type TerrainTheme,
   type TerrainTree,
 } from '@mortar/shared';
@@ -53,17 +53,27 @@ interface Tile {
  * falling-dirt model the world is always a per-column heightmap, so any
  * terrain change = update `surfaces` + repaint the touched tiles from it.
  */
+interface ApronSide {
+  side: 'left' | 'right';
+  /** As generated — the blend's far anchor. */
+  original: Float64Array;
+  /** Inner columns re-anchored on the live world edge (what gets painted). */
+  live: Float64Array;
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  texture: Texture;
+  sprite: Sprite;
+}
+
 export class CpuTileTerrain implements TerrainView {
   readonly container = new Container();
   private tiles: Tile[] = [];
-  private apronSprites: Sprite[] = [];
+  private apronSides: ApronSide[] = [];
   private surfaces: Float64Array = new Float64Array(WORLD_W);
   private width = WORLD_W;
   private cols = 0;
   private theme: TerrainTheme | null = null;
   private noise: CanvasPattern | null = null;
-  /** Fixed wall heights at the world edges (apron index 0) for settling. */
-  private edges: EdgeSurfaces | undefined;
   /** Living scenery trees; blasts prune them, survivors ride the surface. */
   private trees: TerrainTree[] = [];
 
@@ -80,15 +90,9 @@ export class CpuTileTerrain implements TerrainView {
     this.theme = theme;
     this.trees = trees ? [...trees] : [];
     this.noise = makeNoisePattern();
-    this.edges = aprons
-      ? {
-          left: aprons.left.length > 0 ? aprons.left[0] : null,
-          right: aprons.right.length > 0 ? aprons.right[0] : null,
-        }
-      : undefined;
     if (aprons) {
-      this.paintApron(aprons.left, 'left');
-      this.paintApron(aprons.right, 'right');
+      this.setupApron(aprons.left, 'left');
+      this.setupApron(aprons.right, 'right');
     }
 
     for (let row = 0; row < ROWS; row++) {
@@ -127,15 +131,28 @@ export class CpuTileTerrain implements TerrainView {
     for (const c of circles) {
       if (!c.add) this.trees = this.trees.filter((t) => Math.abs(t.x - c.x) > c.r * 0.9);
     }
+    let edgeTouched: { left: boolean; right: boolean } = { left: false, right: false };
     for (const c of circles) {
       const range = c.add
-        ? moundSurfaceCircle(this.surfaces, WORLD_H, c.x, c.r, this.edges)
-        : carveSurfaceCircle(this.surfaces, WORLD_H, c.x, c.y, c.r, this.edges);
+        ? moundSurfaceCircle(this.surfaces, WORLD_H, c.x, c.r)
+        : carveSurfaceCircle(this.surfaces, WORLD_H, c.x, c.y, c.r);
       if (!c.add) scorches.push(c);
       if (!range) continue;
+      if (range.x0 <= 2) edgeTouched = { ...edgeTouched, left: true };
+      if (range.x1 >= this.width - 3) edgeTouched = { ...edgeTouched, right: true };
       const c0 = Math.max(0, Math.floor((range.x0 - 10) / TILE_W));
       const c1 = Math.min(this.cols - 1, Math.floor((range.x1 + 10) / TILE_W));
       for (let col = c0; col <= c1; col++) dirtyCols.add(col);
+    }
+
+    // Edge carves: flow the apron scenery onto the new edge height so no
+    // vertical seam wall appears where the destructible world ends.
+    for (const a of this.apronSides) {
+      if (a.side === 'left' ? !edgeTouched.left : !edgeTouched.right) continue;
+      const edgeH = this.surfaces[a.side === 'left' ? 0 : this.width - 1];
+      blendApron(a.live, a.original, edgeH);
+      this.paintApronSide(a);
+      a.texture.source.update();
     }
 
     for (const col of dirtyCols) {
@@ -244,27 +261,53 @@ export class CpuTileTerrain implements TerrainView {
   }
 
   /**
-   * Decorative hills past the world edge, drawn once at half resolution so
+   * Decorative hills past the world edge, drawn at half resolution so
    * zoomed-out framing never shows bare sky. arr[0] hugs the edge. The apron
    * tucks APRON_OVERLAP px under the edge tiles (tiles paint on top): abutting
    * exactly leaves a hairline of sky at the seam at fractional zoom scales.
+   * Kept repaintable: edge carves re-anchor the inner columns (blendApron)
+   * and redraw so the scenery flows out of craters instead of walling up.
    */
-  private paintApron(arr: Float64Array, side: 'left' | 'right'): void {
-    const theme = this.theme;
-    if (!theme || arr.length === 0) return;
-    const A = arr.length;
-    const cw = Math.ceil(A / 2) + APRON_OVERLAP / 2;
+  private setupApron(arr: Float64Array, side: 'left' | 'right'): void {
+    if (arr.length === 0) return;
+    const cw = Math.ceil(arr.length / 2) + APRON_OVERLAP / 2;
     const ch = Math.ceil(WORLD_H / 2);
     const canvas = document.createElement('canvas');
     canvas.width = cw;
     canvas.height = ch;
-    const ctx = canvas.getContext('2d')!;
+    const a: ApronSide = {
+      side,
+      original: arr,
+      live: Float64Array.from(arr),
+      canvas,
+      ctx: canvas.getContext('2d')!,
+      texture: Texture.EMPTY,
+      sprite: new Sprite(),
+    };
+    this.paintApronSide(a);
+    a.texture = Texture.from(canvas);
+    a.sprite.texture = a.texture;
+    a.sprite.scale.set(2);
+    a.sprite.position.set(side === 'left' ? -arr.length : this.width - APRON_OVERLAP, 0);
+    this.container.addChild(a.sprite);
+    this.apronSides.push(a);
+  }
+
+  private paintApronSide(a: ApronSide): void {
+    const theme = this.theme;
+    if (!theme) return;
+    const { ctx, live: arr, side } = a;
+    const A = arr.length;
+    const cw = a.canvas.width;
+    const ch = a.canvas.height;
 
     // Canvas x → apron index (left apron is mirrored: outward = leftward).
     // The overlap strip clamps to arr[0], the height at the world edge.
     const idxAt = (cx: number) =>
       Math.min(A - 1, Math.max(0, side === 'left' ? A - 1 - cx * 2 : cx * 2 - APRON_OVERLAP));
 
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.clearRect(0, 0, cw, ch);
     const g = ctx.createLinearGradient(0, 0.19 * WORLD_H, 0, ch);
     g.addColorStop(0, cssColor(theme.soilTop));
     g.addColorStop(1, cssColor(theme.soilDeep));
@@ -297,12 +340,6 @@ export class CpuTileTerrain implements TerrainView {
     ctx.lineWidth = 3.5;
     ctx.lineJoin = 'round';
     ctx.stroke();
-
-    const sprite = new Sprite(Texture.from(canvas));
-    sprite.scale.set(2);
-    sprite.position.set(side === 'left' ? -A : this.width - APRON_OVERLAP, 0);
-    this.container.addChild(sprite);
-    this.apronSprites.push(sprite);
   }
 
   private scorch(tile: Tile, c: CarveCircle): void {
@@ -336,12 +373,11 @@ export class CpuTileTerrain implements TerrainView {
       if (tile.texture !== Texture.EMPTY) tile.texture.destroy(true);
     }
     this.tiles = [];
-    for (const s of this.apronSprites) {
-      const tex = s.texture;
-      s.destroy();
-      tex.destroy(true);
+    for (const a of this.apronSides) {
+      a.sprite.destroy();
+      if (a.texture !== Texture.EMPTY) a.texture.destroy(true);
     }
-    this.apronSprites = [];
+    this.apronSides = [];
   }
 
   destroy(): void {

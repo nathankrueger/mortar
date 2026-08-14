@@ -19,10 +19,29 @@ export interface ApronSurfaces {
   right: ArrayLike<number>;
 }
 
-/** Surface y just outside each world edge (null = open edge, no apron). */
-export interface EdgeSurfaces {
-  left: number | null;
-  right: number | null;
+/**
+ * How far (wu) into the apron the scenery re-anchors on the world's current
+ * edge height. After a carve reaches the edge column, the apron's inner
+ * stretch is re-blended so terrain flows continuously out of the world
+ * instead of standing as an untouched wall with a vertical seam.
+ */
+export const APRON_BLEND = 160;
+
+function smootherstep(t: number): number {
+  return t * t * (3 - 2 * t);
+}
+
+/** Re-anchor an apron's inner columns on the current edge surface height. */
+export function blendApron(
+  live: Float64Array,
+  original: ArrayLike<number>,
+  edgeSurfaceY: number,
+): void {
+  const n = Math.min(APRON_BLEND, live.length);
+  for (let i = 0; i < n; i++) {
+    const t = smootherstep(i / n);
+    live[i] = edgeSurfaceY * (1 - t) + original[i] * t;
+  }
 }
 
 /** How far a slide may spread past a blast, and how hard we chase settling. */
@@ -46,9 +65,9 @@ function reposeStep(x: number): number {
  * Angle-of-repose settling: wherever neighbor columns differ by more than the
  * (jittered) repose step, dirt slides from the taller into the shorter until
  * the range is stable — fresh crater walls slump into ragged scree instead of
- * standing as 90° slots. Columns just outside the world act as fixed-height
- * walls when an apron exists: dirt can slide in from them (or vanish past
- * them) but they never change. Mutates `surfaces`; returns the settled range.
+ * standing as 90° slots. The world edges are open: edge craters keep their
+ * depth, and the aprons re-blend onto the carved edge instead (blendApron).
+ * Mutates `surfaces`; returns the settled range.
  */
 export function relaxSurfaceRange(
   surfaces: Float64Array,
@@ -56,43 +75,36 @@ export function relaxSurfaceRange(
   cx0: number,
   cx1: number,
   r: number,
-  edges?: EdgeSurfaces,
 ): { x0: number; x1: number } {
   const w = surfaces.length;
   const margin = Math.min(240, Math.ceil(r) + 24);
   const x0 = Math.max(0, cx0 - margin);
   const x1 = Math.min(w - 1, cx1 + margin);
-  const leftEdge = edges?.left ?? null;
-  const rightEdge = edges?.right ?? null;
 
-  const at = (x: number): number => {
-    if (x < 0) return leftEdge ?? surfaces[0];
-    if (x >= w) return rightEdge ?? surfaces[w - 1];
-    return surfaces[x];
-  };
-  // Slide between columns x and x+1; virtual out-of-world columns are fixed.
+  // Slide between in-world columns x and x+1.
   const settle = (x: number): boolean => {
-    if ((x < 0 && leftEdge === null) || (x + 1 >= w && rightEdge === null)) return false;
-    const a = at(x);
-    const b = at(x + 1);
+    const a = surfaces[x];
+    const b = surfaces[x + 1];
     const m = reposeStep(x);
     const diff = a - b; // y-down: positive = column x sits lower than x+1
     if (diff <= m && diff >= -m) return false;
     const t = (Math.abs(diff) - m) / 2;
     if (diff > m) {
-      if (x >= 0 && x < w) surfaces[x] = a - t;
-      if (x + 1 < w) surfaces[x + 1] = b + t;
+      surfaces[x] = a - t;
+      surfaces[x + 1] = b + t;
     } else {
-      if (x >= 0 && x < w) surfaces[x] = a + t;
-      if (x + 1 < w) surfaces[x + 1] = b - t;
+      surfaces[x] = a + t;
+      surfaces[x + 1] = b - t;
     }
     return true;
   };
 
+  const p0 = Math.max(0, x0 - 1);
+  const p1 = Math.min(w - 2, x1);
   for (let pass = 0; pass < RELAX_MAX_PASSES; pass++) {
     let moved = false;
-    for (let x = x0 - 1; x <= x1; x++) if (settle(x)) moved = true;
-    for (let x = x1; x >= x0 - 1; x--) if (settle(x)) moved = true;
+    for (let x = p0; x <= p1; x++) if (settle(x)) moved = true;
+    for (let x = p1; x >= p0; x--) if (settle(x)) moved = true;
     if (!moved) break;
   }
   for (let x = x0; x <= x1; x++) {
@@ -115,7 +127,6 @@ export function carveSurfaceCircle(
   cx: number,
   cy: number,
   r: number,
-  edges?: EdgeSurfaces,
 ): { x0: number; x1: number } | null {
   const w = surfaces.length;
   const x0 = Math.max(0, Math.ceil(cx - r));
@@ -135,7 +146,7 @@ export function carveSurfaceCircle(
     }
   }
   if (!changed) return null;
-  return relaxSurfaceRange(surfaces, worldH, x0, x1, r, edges);
+  return relaxSurfaceRange(surfaces, worldH, x0, x1, r);
 }
 
 /**
@@ -147,7 +158,6 @@ export function moundSurfaceCircle(
   worldH: number,
   cx: number,
   r: number,
-  edges?: EdgeSurfaces,
 ): { x0: number; x1: number } | null {
   const w = surfaces.length;
   const x0 = Math.max(0, Math.ceil(cx - r));
@@ -159,7 +169,7 @@ export function moundSurfaceCircle(
     const dome = Math.sqrt(Math.max(0, r2 - dx * dx));
     surfaces[x] = Math.max(0, surfaces[x] - dome);
   }
-  return relaxSurfaceRange(surfaces, worldH, x0, x1, r, edges);
+  return relaxSurfaceRange(surfaces, worldH, x0, x1, r);
 }
 
 /**
@@ -179,12 +189,17 @@ export class TerrainMask {
   /** Solid pixels per column, bottom-aligned. */
   readonly counts: Int32Array;
   private readonly aprons: ApronSurfaces | null;
+  /** Apron surfaces re-anchored on the live edge columns (collision truth). */
+  private apronLive: { left: Float64Array; right: Float64Array } | null;
 
   constructor(w = WORLD_W, h = WORLD_H, counts?: Int32Array, aprons: ApronSurfaces | null = null) {
     this.w = w;
     this.h = h;
     this.counts = counts ?? new Int32Array(w);
     this.aprons = aprons;
+    this.apronLive = aprons
+      ? { left: Float64Array.from(aprons.left), right: Float64Array.from(aprons.right) }
+      : null;
   }
 
   static fromHeights(
@@ -201,25 +216,32 @@ export class TerrainMask {
   }
 
   clone(): TerrainMask {
-    return new TerrainMask(this.w, this.h, this.counts.slice(), this.aprons);
+    const copy = new TerrainMask(this.w, this.h, this.counts.slice(), this.aprons);
+    if (this.apronLive && copy.apronLive) {
+      copy.apronLive.left.set(this.apronLive.left);
+      copy.apronLive.right.set(this.apronLive.right);
+    }
+    return copy;
   }
 
   /** Apron surface y for an out-of-world column, or null past the aprons. */
   private apronSurfaceAt(xi: number): number | null {
-    if (!this.aprons) return null;
-    const arr = xi < 0 ? this.aprons.left : this.aprons.right;
+    if (!this.apronLive) return null;
+    const arr = xi < 0 ? this.apronLive.left : this.apronLive.right;
     const idx = xi < 0 ? -1 - xi : xi - this.w;
     if (idx >= arr.length) return null;
     return arr[idx];
   }
 
-  /** Fixed wall heights the settling pass leans on at the world edges. */
-  private edgeSurfaces(): EdgeSurfaces | undefined {
-    if (!this.aprons) return undefined;
-    return {
-      left: this.aprons.left.length > 0 ? this.aprons.left[0] : null,
-      right: this.aprons.right.length > 0 ? this.aprons.right[0] : null,
-    };
+  /** After an edge-touching carve, flow the aprons onto the new edge height. */
+  private reblendAprons(range: { x0: number; x1: number }): void {
+    if (!this.aprons || !this.apronLive) return;
+    if (range.x0 <= 2) {
+      blendApron(this.apronLive.left, this.aprons.left, this.h - this.counts[0]);
+    }
+    if (range.x1 >= this.w - 3) {
+      blendApron(this.apronLive.right, this.aprons.right, this.h - this.counts[this.w - 1]);
+    }
   }
 
   /** Topmost solid y in a column (h = bare bedrock). */
@@ -255,15 +277,21 @@ export class TerrainMask {
   /** Blast a circle out; displaced dirt falls in and the walls settle. */
   carveCircle(cx: number, cy: number, r: number): void {
     const surf = this.surfaceView();
-    const range = carveSurfaceCircle(surf, this.h, cx, cy, r, this.edgeSurfaces());
-    if (range) this.commitSurfaces(surf, range.x0, range.x1);
+    const range = carveSurfaceCircle(surf, this.h, cx, cy, r);
+    if (range) {
+      this.commitSurfaces(surf, range.x0, range.x1);
+      this.reblendAprons(range);
+    }
   }
 
   /** Pile a half-disc of dirt on top of the surface; flanks settle. */
   addMound(cx: number, r: number): void {
     const surf = this.surfaceView();
-    const range = moundSurfaceCircle(surf, this.h, cx, r, this.edgeSurfaces());
-    if (range) this.commitSurfaces(surf, range.x0, range.x1);
+    const range = moundSurfaceCircle(surf, this.h, cx, r);
+    if (range) {
+      this.commitSurfaces(surf, range.x0, range.x1);
+      this.reblendAprons(range);
+    }
   }
 
   applyCarves(circles: readonly CarveCircle[]): void {
