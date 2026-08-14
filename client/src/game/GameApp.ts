@@ -155,7 +155,11 @@ export class GameApp {
     }
     const gen = generateTerrain(seed, worldW);
     this.camera.setWorldWidth(worldW ?? gen.heights.length);
-    this.mask = TerrainMask.fromHeights(gen.heights);
+    // Aprons ride along so near-edge shots collide with the scenery hills.
+    this.mask = TerrainMask.fromHeights(gen.heights, undefined, undefined, {
+      left: gen.apronLeft,
+      right: gen.apronRight,
+    });
     this.theme = themeFor(gen.themeIndex);
 
     // Per-match liveries: tanks get them directly; the HUD follows for free

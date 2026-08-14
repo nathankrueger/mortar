@@ -127,9 +127,11 @@ function PowerSlider({
         dragRef.current = null;
       }}
     >
+      {/* -8px keeps the fill inset 4px at the top at full power, matching
+          the 4px side/bottom insets instead of jamming into the track rim. */}
       <div
         className="absolute right-1 bottom-1 left-1 rounded-full bg-gradient-to-t from-amber-400/80 to-red-400/80"
-        style={{ height: `calc(${Math.round(frac * 100)}% - 4px)` }}
+        style={{ height: `calc(${Math.round(frac * 100)}% - 8px)` }}
       />
       <span className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center font-mono text-xs font-bold text-white/90 select-none">
         {power.toFixed(0)}

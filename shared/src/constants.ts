@@ -40,7 +40,9 @@ export const MAX_PROJECTILE_SECONDS = 15; // per-projectile lifetime cap
 export const MAX_RESOLUTION_SECONDS = 20; // whole-shot watchdog
 
 // Out-of-bounds margins before a projectile fizzles.
-export const OOB_MARGIN_X = 200;
+// Wide enough that arcs over the (solid, visible) apron hills land on them
+// rather than vanishing mid-air in front of the player.
+export const OOB_MARGIN_X = 700;
 export const OOB_MARGIN_Y_BOTTOM = 50;
 
 // ---- Wire quantization -------------------------------------------------

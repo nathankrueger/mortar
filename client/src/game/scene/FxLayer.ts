@@ -13,6 +13,25 @@ interface Fx {
 const TIER_TRAUMA = [0.22, 0.38, 0.52, 0.72, 1.0];
 const SPARK_TINTS = [0xffd27a, 0xffb85c, 0xfff1c4];
 
+/** Cooling-fire palette, white-hot at t=0 down to smoldering red at t=1. */
+const FIRE_STOPS = [0xfff7dc, 0xffd968, 0xff9030, 0xe0501e, 0x6e2012];
+
+function lerpColor(a: number, b: number, t: number): number {
+  const ar = a >> 16, ag = (a >> 8) & 0xff, ab = a & 0xff;
+  const br = b >> 16, bg = (b >> 8) & 0xff, bb = b & 0xff;
+  return (
+    (((ar + (br - ar) * t) | 0) << 16) |
+    (((ag + (bg - ag) * t) | 0) << 8) |
+    ((ab + (bb - ab) * t) | 0)
+  );
+}
+
+function fireTint(t: number): number {
+  const p = Math.min(0.999, Math.max(0, t)) * (FIRE_STOPS.length - 1);
+  const i = p | 0;
+  return lerpColor(FIRE_STOPS[i], FIRE_STOPS[i + 1], p - i);
+}
+
 /**
  * Explosion visuals: additive flash + shock ring + debris/spark particles +
  * buoyant smoke, with rising mushroom clouds for the nuke tiers.
@@ -90,9 +109,48 @@ export class FxLayer {
       drag: 0.8,
     });
 
-    // Lingering smoke.
+    // Rolling fireball for the heavy tiers, then lingering smoke.
+    if (tier >= 1) this.fireball(x, y, r, tier);
     this.smokePuffs(x, y - r * 0.2, 5 + tier * 5, r, tier);
     if (tier >= 1) this.mushroom(x, y, r, tier);
+  }
+
+  /**
+   * Boiling additive fire: a cluster of glow blobs that swell, rise, and cool
+   * white → yellow → orange → deep red before the smoke takes over.
+   */
+  private fireball(x: number, y: number, r: number, tier: number): void {
+    const count = 10 + tier * 7;
+    for (let i = 0; i < count; i++) {
+      const ball = new Sprite(glowTexture());
+      ball.anchor.set(0.5);
+      ball.blendMode = 'add';
+      const ang = Math.random() * Math.PI * 2;
+      const rad = Math.random() * r * 0.55;
+      ball.position.set(x + Math.cos(ang) * rad, y + Math.sin(ang) * rad * 0.7 - r * 0.1);
+      this.container.addChild(ball);
+      const base = (r * (0.45 + Math.random() * 0.5)) / ball.texture.width;
+      const rise = 30 + Math.random() * 50 + tier * 25;
+      const drift = Math.cos(ang) * (20 + Math.random() * 30);
+      const dur = 0.55 + Math.random() * 0.35 + tier * 0.16;
+      const delay = Math.random() * 0.09;
+      this.push(
+        dur + delay,
+        (f, dt) => {
+          const t = Math.max(0, (f * (dur + delay) - delay) / dur);
+          if (t <= 0) {
+            ball.alpha = 0;
+            return;
+          }
+          ball.tint = fireTint(t);
+          ball.alpha = t < 0.12 ? t / 0.12 : 1 - (t - 0.12) / 0.88;
+          ball.scale.set(base * (0.45 + t * 1.35));
+          ball.y -= rise * dt;
+          ball.x += drift * dt;
+        },
+        () => ball.destroy(),
+      );
+    }
   }
 
   private smokePuffs(x: number, y: number, count: number, r: number, tier: number): void {

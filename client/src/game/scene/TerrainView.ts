@@ -5,6 +5,7 @@ import {
   WORLD_H,
   WORLD_W,
   type CarveCircle,
+  type EdgeSurfaces,
   type TerrainTheme,
 } from '@mortar/shared';
 import { Container, Sprite, Texture } from 'pixi.js';
@@ -55,6 +56,8 @@ export class CpuTileTerrain implements TerrainView {
   private cols = 0;
   private theme: TerrainTheme | null = null;
   private noise: CanvasPattern | null = null;
+  /** Fixed wall heights at the world edges (apron index 0) for settling. */
+  private edges: EdgeSurfaces | undefined;
 
   init(heights: Float64Array, theme: TerrainTheme, aprons?: TerrainAprons): void {
     this.disposeTiles();
@@ -63,6 +66,12 @@ export class CpuTileTerrain implements TerrainView {
     this.cols = Math.ceil(this.width / TILE_W);
     this.theme = theme;
     this.noise = makeNoisePattern();
+    this.edges = aprons
+      ? {
+          left: aprons.left.length > 0 ? aprons.left[0] : null,
+          right: aprons.right.length > 0 ? aprons.right[0] : null,
+        }
+      : undefined;
     if (aprons) {
       this.paintApron(aprons.left, 'left');
       this.paintApron(aprons.right, 'right');
@@ -102,8 +111,8 @@ export class CpuTileTerrain implements TerrainView {
     const scorches: CarveCircle[] = [];
     for (const c of circles) {
       const range = c.add
-        ? moundSurfaceCircle(this.surfaces, c.x, c.r)
-        : carveSurfaceCircle(this.surfaces, WORLD_H, c.x, c.y, c.r);
+        ? moundSurfaceCircle(this.surfaces, WORLD_H, c.x, c.r, this.edges)
+        : carveSurfaceCircle(this.surfaces, WORLD_H, c.x, c.y, c.r, this.edges);
       if (!c.add) scorches.push(c);
       if (!range) continue;
       const c0 = Math.max(0, Math.floor((range.x0 - 10) / TILE_W));
@@ -212,11 +221,16 @@ export class CpuTileTerrain implements TerrainView {
       ctx.fillRect(0, 0, cw, ch);
       ctx.globalAlpha = 1;
     }
+    // Close the cut with vertical edges past the canvas: a diagonal closure
+    // leaves an unerased soil sliver in the end columns — a needle of dirt
+    // sticking into the sky right at the world edge.
     ctx.globalCompositeOperation = 'destination-out';
     ctx.fillStyle = '#000';
     ctx.beginPath();
     ctx.moveTo(-2, -10);
+    ctx.lineTo(-2, arr[idxAt(0)] / 2);
     for (let cx = 0; cx < cw; cx++) ctx.lineTo(cx, arr[idxAt(cx)] / 2);
+    ctx.lineTo(cw + 2, arr[idxAt(cw - 1)] / 2);
     ctx.lineTo(cw + 2, -10);
     ctx.closePath();
     ctx.fill();

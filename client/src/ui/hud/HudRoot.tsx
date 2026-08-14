@@ -71,13 +71,13 @@ export function HudRoot({
         <MobileControls power={aim.power} onAimBy={onAimBy} onSetPower={onSetPower} onFire={onFire} />
       )}
 
-      {/* Top bar */}
-      <div className="absolute top-0 right-0 left-0 flex items-start justify-between gap-3 p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pr-[max(0.75rem,env(safe-area-inset-right))] pl-[max(0.75rem,env(safe-area-inset-left))]">
-        <div className="flex items-start gap-2">
+      {/* Top bar — hugs the corners; cards stay compact so the sky is game. */}
+      <div className="absolute top-0 right-0 left-0 flex items-start justify-between gap-3 p-1.5 pt-[max(0.375rem,calc(env(safe-area-inset-top)/2))] pr-[max(0.375rem,calc(env(safe-area-inset-right)/2))] pl-[max(0.375rem,calc(env(safe-area-inset-left)/2))]">
+        <div className="flex items-start gap-1.5">
           <button
             onClick={() => setMenuOpen(true)}
             aria-label="Menu"
-            className="pointer-events-auto mt-0.5 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-slate-900/50 text-white/85 backdrop-blur-xl transition-all hover:bg-black/40 active:scale-95"
+            className="pointer-events-auto mt-0.5 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-slate-900/50 text-white/85 backdrop-blur-xl transition-all hover:bg-black/40 active:scale-95"
           >
             <span className="text-lg leading-none">≡</span>
           </button>
