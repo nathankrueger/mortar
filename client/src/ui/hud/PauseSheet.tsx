@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { tryEnterGameFullscreen } from '../../app/orientation';
 import { CAN_FULLSCREEN, IS_IOS, isStandalone } from '../../app/platform';
+import { loadTracer, saveTracer } from '../../app/settings';
 import { audio } from '../../audio/AudioEngine';
+import { getGame } from '../../game/gameHost';
 import { Button } from '../kit/Button';
 import { GlassPanel } from '../kit/GlassPanel';
 
@@ -25,6 +27,14 @@ export function applySavedVolumes(): void {
 /** In-game menu: volume, resume, leave. Opened with Esc or the ≡ button. */
 export function PauseSheet({ onResume, onExit }: { onResume: () => void; onExit: () => void }) {
   const [vol, setVol] = useState(loadVolumes);
+  const [tracer, setTracer] = useState(loadTracer);
+
+  const updateTracer = (pct: number) => {
+    const v = pct / 100;
+    setTracer(v);
+    saveTracer(v);
+    getGame()?.setTracer(v); // live — no need to fire a shot to see it
+  };
 
   const update = (sfx: number, ui: number) => {
     const next = { sfx, ui };
@@ -64,6 +74,19 @@ export function PauseSheet({ onResume, onExit }: { onResume: () => void; onExit:
             max={100}
             value={Math.round(vol.ui * 100)}
             onChange={(e) => update(vol.sfx, Number(e.target.value) / 100)}
+            className="accent-white"
+          />
+        </label>
+        <label className="flex flex-col gap-2">
+          <span className="flex justify-between text-xs font-semibold text-white/60 uppercase">
+            Shot tracer <span>{tracer === 0 ? 'Off' : `${Math.round(tracer * 100)}%`}</span>
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={Math.round(tracer * 100)}
+            onChange={(e) => updateTracer(Number(e.target.value))}
             className="accent-white"
           />
         </label>

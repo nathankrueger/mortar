@@ -16,6 +16,7 @@ import {
 import { WEAPONS, type WeaponId } from '@mortar/shared';
 import { Application, Container, Sprite, Texture } from 'pixi.js';
 import { touchHudRightReserve } from '../app/platform';
+import { loadTracer } from '../app/settings';
 import { sfx } from '../audio/sfx';
 import { Camera, type InterestBox } from './camera';
 import { ShotPlayback, type PlaybackDelegate } from './playback';
@@ -25,6 +26,7 @@ import { ProjectileLayer } from './scene/ProjectileView';
 import { SkyLayer } from './scene/SkyLayer';
 import { CpuTileTerrain } from './scene/TerrainView';
 import { TankView } from './scene/TankView';
+import { TracerLayer } from './scene/TracerLayer';
 import { WeatherLayer } from './scene/WeatherLayer';
 import { ScreenShake } from './shake';
 
@@ -66,6 +68,7 @@ export class GameApp {
   readonly clouds = new CloudLayer();
   readonly shake = new ScreenShake();
   readonly projectiles = new ProjectileLayer();
+  readonly tracers = new TracerLayer();
   readonly fx = new FxLayer();
   readonly weather = new WeatherLayer();
 
@@ -114,6 +117,7 @@ export class GameApp {
 
     this.app.stage.addChild(this.sky.container, this.worldRoot);
     this.worldRoot.addChild(this.clouds.container);
+    this.tracers.setStrength(loadTracer());
 
     // Full-screen flash quad for The Big One (above the world).
     this.screenFlash = new Sprite(Texture.WHITE);
@@ -189,12 +193,14 @@ export class GameApp {
     this.worldRoot.addChild(
       this.terrain.container,
       this.tankLayer,
+      this.tracers.container,
       this.projectiles.container,
       this.fx.container,
       this.weather.container,
     );
     this.fx.onTrauma = (amount) => this.shake.add(amount);
     this.projectiles.clear();
+    this.tracers.clear();
     this.fx.clear();
     for (const t of this.tanks.values()) t.container.destroy();
     this.tanks.clear();
@@ -238,6 +244,11 @@ export class GameApp {
     this.weather.setWind(wind);
   }
 
+  /** Tracer tail strength, 0 (off) … 1 — live from the pause menu slider. */
+  setTracer(strength: number): void {
+    this.tracers.setStrength(strength);
+  }
+
   /** Visual-only carve (the sim already carved its mask before playback). */
   carveVisual(circles: readonly CarveCircle[]): void {
     this.terrain?.applyCarves(circles);
@@ -255,16 +266,23 @@ export class GameApp {
         this.projHot.set(id, hot);
         if (id === 1) sfx.fire(spec?.tier ?? 0);
         this.projectiles.spawn(id, kind, x, y);
+        this.tracers.spawn(id, x, y, hot);
       },
       move: (id, x, y) => {
         this.projectiles.move(id, x, y);
+        this.tracers.push(id, x, y);
+        // Motes are the tracer's smoke — a tracer of 0 leaves a bare shell.
+        if (!this.tracers.enabled) return;
         const now = performance.now();
         if (now - (this.lastTrail.get(id) ?? 0) > 26) {
           this.lastTrail.set(id, now);
           this.fx.trail(x, y, this.projHot.get(id) ?? false);
         }
       },
-      remove: (id) => this.projectiles.remove(id),
+      remove: (id) => {
+        this.projectiles.remove(id);
+        this.tracers.release(id);
+      },
       bounce: (x, y) => {
         this.fx.bounce(x, y);
         sfx.bounce();
@@ -369,6 +387,7 @@ export class GameApp {
       this.screenFlash.alpha = Math.max(0, this.screenFlash.alpha - dt * 1.1);
     }
     for (const t of this.tanks.values()) t.update(dt);
+    this.tracers.update(dt);
     this.shake.update(dt, this.camera);
     this.camera.update(dt, this.followInterest());
     this.sky.update(dt, this.camera.worldLeft, this.camera.currentScale);
