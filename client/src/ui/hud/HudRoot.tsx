@@ -100,9 +100,9 @@ export function HudRoot({
             </div>
           )}
           {phase === 'aim' && (
-            <div key={`${turnNumber}-${turnSeat}`} className="turn-banner">
+            <div key={`${turnNumber}-${turnSeat}`} className="turn-banner mt-3">
               <span
-                className={`rounded-full bg-slate-900/50 px-5 py-1.5 text-2xl font-bold tracking-tight backdrop-blur-xl ${SEAT_TEXT[turnSeat]}`}
+                className={`rounded-full bg-slate-900/50 px-4 py-1 text-xl font-bold tracking-tight backdrop-blur-xl ${SEAT_TEXT[turnSeat]}`}
               >
                 {seats[turnSeat].nickname}
               </span>
