@@ -54,6 +54,15 @@ describe('generateTerrain', () => {
     }
   });
 
+  it('never starts a tank deeper than the bottom-HUD band', () => {
+    for (let seed = 0; seed < 200; seed++) {
+      const { heights, spawnX } = generateTerrain(seed);
+      for (const sx of spawnX) {
+        expect(heights[sx]).toBeLessThanOrEqual(0.66 * WORLD_H + 1e-9);
+      }
+    }
+  });
+
   it('flattens a level shelf around each spawn', () => {
     for (let seed = 0; seed < 20; seed++) {
       const { heights, spawnX } = generateTerrain(seed);

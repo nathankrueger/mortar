@@ -19,6 +19,9 @@ const PERSISTENCE = 0.5;
 
 const SPAWN_SHELF_HALF = 32; // flat shelf half-width around each spawn
 const SPAWN_BLEND = 24; // extra margin blending shelf back into terrain
+/** Deepest surface a tank may start on — keeps spawns clear of the screen
+ *  band the bottom HUD overlays on cropped (phone) viewports. */
+const SPAWN_MAX_Y = 0.66 * WORLD_H;
 
 export type MacroFeature = 'rolling' | 'plateau' | 'twin-peaks' | 'canyon';
 const MACRO_FEATURES: readonly MacroFeature[] = ['rolling', 'plateau', 'twin-peaks', 'canyon'];
@@ -141,8 +144,8 @@ export function generateTerrain(seed: number, worldW = WORLD_W): GeneratedTerrai
 
   // 2) Macro landform + spawn slots + theme (rolled after noise, fixed order).
   const macro = MACRO_FEATURES[randInt(rng, 0, MACRO_FEATURES.length - 1)];
-  const spawn0 = Math.round(randRange(rng, 0.05, 0.15) * w);
-  const spawn1 = Math.round(randRange(rng, 0.85, 0.95) * w);
+  let spawn0 = Math.round(randRange(rng, 0.05, 0.15) * w);
+  let spawn1 = Math.round(randRange(rng, 0.85, 0.95) * w);
   const themeIndex = randInt(rng, 0, THEMES.length - 1);
 
   // 3) Compose surface heights.
@@ -152,6 +155,25 @@ export function generateTerrain(seed: number, worldW = WORLD_W): GeneratedTerrai
     const y = BASE_LEVEL - (n - 0.5) * 2 * NOISE_AMPLITUDE - macroOffset(macro, x, w);
     heights[x] = softClamp(y);
   }
+
+  // 3.5) Nudge each spawn out of the deepest ravines: the bottom HUD (weapon
+  //      tray) overlays the lowest band of the screen, so a start deeper than
+  //      SPAWN_MAX_Y would sit behind the controls. Deterministic search for
+  //      the nearest acceptable column within the same band — usually a tiny
+  //      shift, and no extra RNG so nothing else about the map changes.
+  const nudgeSpawn = (sx: number, lo: number, hi: number): number => {
+    if (heights[sx] <= SPAWN_MAX_Y) return sx;
+    for (let d = 1; d <= hi - lo; d++) {
+      if (sx - d >= lo && heights[sx - d] <= SPAWN_MAX_Y) return sx - d;
+      if (sx + d <= hi && heights[sx + d] <= SPAWN_MAX_Y) return sx + d;
+    }
+    // Whole band is deep: settle for its highest ground.
+    let best = lo;
+    for (let x = lo; x <= hi; x++) if (heights[x] < heights[best]) best = x;
+    return best;
+  };
+  spawn0 = nudgeSpawn(spawn0, Math.round(0.05 * w), Math.round(0.15 * w));
+  spawn1 = nudgeSpawn(spawn1, Math.round(0.85 * w), Math.round(0.95 * w));
 
   // 4) Cosmetic aprons past both edges (drawn after all gameplay rolls so
   //    earlier RNG consumption — and therefore the playfield — is unchanged).
@@ -174,9 +196,11 @@ export function generateTerrain(seed: number, worldW = WORLD_W): GeneratedTerrai
     return arr;
   };
 
-  // 5) Flatten a landing shelf at each spawn so tanks start level.
+  // 5) Flatten a landing shelf at each spawn so tanks start level. If even
+  //    the band's best ground was too deep, the shelf rises to the cap — a
+  //    small ledge terrace beats a tank hidden behind the bottom HUD.
   for (const sx of [spawn0, spawn1]) {
-    const shelfY = heights[clamp(sx, 0, w - 1)];
+    const shelfY = Math.min(heights[clamp(sx, 0, w - 1)], SPAWN_MAX_Y);
     const from = Math.max(0, sx - SPAWN_SHELF_HALF - SPAWN_BLEND);
     const to = Math.min(w - 1, sx + SPAWN_SHELF_HALF + SPAWN_BLEND);
     for (let x = from; x <= to; x++) {
