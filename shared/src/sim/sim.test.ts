@@ -173,7 +173,7 @@ describe('weapon behaviors', () => {
     expect(ofType(out.events, 'explode')).toHaveLength(1);
   });
 
-  it('bounce bomb detonates on every hop, then a finale (or duds out)', () => {
+  it('chaos bomb detonates on every hop, then a finale (or duds out)', () => {
     let bouncesSeen = 0;
     let duds = 0;
     for (let seed = 0; seed < 250; seed++) {
@@ -240,7 +240,45 @@ describe('weapon behaviors', () => {
     expect(mean).toBeLessThan(3.5);
   });
 
-  it('mirv bounce: 5 hopping warheads, each at most 2 hops, none dud', () => {
+  it('chaos hops pick a fresh direction instead of carrying through', () => {
+    // Fired rightward: if hops inherited their heading, vx would stay positive.
+    let left = 0;
+    let right = 0;
+    for (let seed = 0; seed < 300; seed++) {
+      const out = fire(makeCtx({ seed, tank1: [2350, FLAT_Y] }), {
+        weapon: 'bounceBomb',
+        angleDeg: 55,
+        power: 55,
+      });
+      for (const b of ofType(out.events, 'bounce')) {
+        if (b.vx < 0) left++;
+        else right++;
+      }
+    }
+    const total = left + right;
+    expect(total).toBeGreaterThan(200);
+    expect(left / total).toBeGreaterThan(0.35);
+    expect(left / total).toBeLessThan(0.65);
+  });
+
+  it('every bounce weapon hops both ways', () => {
+    for (const weapon of ['bounceBomb', 'mirvBounce'] as const) {
+      let left = 0;
+      let right = 0;
+      for (let seed = 0; seed < 120; seed++) {
+        const out = fire(makeCtx({ seed, tank1: [2350, FLAT_Y] }), {
+          weapon,
+          angleDeg: 60,
+          power: 65,
+        });
+        for (const b of ofType(out.events, 'bounce')) (b.vx < 0 ? left++ : right++);
+      }
+      expect(left, `${weapon} never hopped left`).toBeGreaterThan(0);
+      expect(right, `${weapon} never hopped right`).toBeGreaterThan(0);
+    }
+  });
+
+  it('mirv chaos: 5 hopping warheads, each at most 2 hops, none dud', () => {
     const out = fire(makeCtx({ tank1: [2350, FLAT_Y] }), {
       weapon: 'mirvBounce',
       angleDeg: 70,

@@ -319,9 +319,14 @@ export function resolveShot(ctx: ShotContext, params: ShotParams): ShotOutcome {
     settleTanks(ctx, events, tick);
 
     // The blast just carved the ground away — launch out of the fresh crater.
+    // Chaos: the heading is rolled fresh every hop instead of carrying through,
+    // so the bomb is as likely to leap back the way it came as to press on.
+    // Incoming speed only sets how much energy is available, never which way.
     p.x = hx;
     p.y = hy - 4;
-    p.vx = p.vx * b.restitution + randRange(rng, -b.nudge, b.nudge);
+    const budget = Math.abs(p.vx) * b.restitution + b.nudge;
+    const speed = randRange(rng, 0.25, 1) * budget;
+    p.vx = chance(rng, 0.5) ? speed : -speed;
     p.vy = -randRange(rng, 280, 400);
     p.bounces++;
     events.push({ t: 'bounce', id: p.id, x: p.x, y: p.y, vx: p.vx, vy: p.vy, n: p.bounces, tick });

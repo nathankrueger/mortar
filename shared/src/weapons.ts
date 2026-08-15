@@ -45,9 +45,12 @@ export interface BounceSpec {
   /** Hop count rolled in [min, max] from the shot seed. */
   min: number;
   max: number;
-  /** Horizontal velocity retained per hop. */
+  /** Fraction of incoming horizontal speed that feeds the next hop's energy. */
   restitution: number;
-  /** Seeded random horizontal kick per hop (± wu/s). */
+  /**
+   * Extra horizontal speed budget per hop (wu/s), so a near-vertical drop
+   * still leaps somewhere. The hop's direction is always rolled fresh.
+   */
   nudge: number;
   /** Probability the FINAL landing fizzles instead of delivering the finale. */
   dudChance: number;
@@ -247,8 +250,8 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
   },
   bounceBomb: {
     id: 'bounceBomb',
-    name: 'Bounce Bomb',
-    blurb: 'Detonates, leaps away, detonates again. Usually finishes big.',
+    name: 'Chaos Bomb',
+    blurb: 'Detonates, then leaps off in a random direction. Usually finishes big.',
     price: 900,
     behavior: 'bounce',
     blastR: 62, // finale
@@ -266,8 +269,8 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
   },
   mirvBounce: {
     id: 'mirvBounce',
-    name: 'Mirv Bounce',
-    blurb: 'Five warheads, each hopping and blasting on its own.',
+    name: 'Mirv Chaos',
+    blurb: 'Five warheads, each caroming off on its own random path.',
     price: 3400,
     behavior: 'mirvBounce',
     blastR: 38, // finale per warhead
