@@ -16,9 +16,29 @@ LOG="server.log"
 pids() { lsof -ti:"$PORT" -sTCP:LISTEN 2>/dev/null || true; }
 is_running() { [ -n "$(pids)" ]; }
 
+# True when there is no build, or any source is newer than the built client.
+# Serving a stale bundle looks exactly like "the fix didn't work", so the
+# start path rebuilds instead of trusting whatever dist happens to be there.
+needs_build() {
+  if [ ! -f client/dist/index.html ] || [ ! -f server/dist/index.js ]; then
+    return 0
+  fi
+  local newer
+  newer=$(
+    find client/src client/index.html client/public shared/src server/src \
+      package.json client/package.json shared/package.json server/package.json \
+      client/vite.config.ts -newer client/dist/index.html -print 2>/dev/null |
+      head -1 || true
+  )
+  [ -n "$newer" ]
+}
+
 status() {
   if is_running; then
     echo "mortar server: running on port $PORT (pid $(pids | head -1))"
+    if needs_build; then
+      echo "  STALE: sources are newer than the served build — ./run_server.sh -r"
+    fi
     if health=$(curl -sf "http://localhost:$PORT/healthz"); then
       echo "  health: $health"
     else
@@ -45,10 +65,13 @@ stop_server() {
 start_server() {
   if is_running; then
     echo "mortar server: already running on port $PORT (use -r to restart)"
+    if needs_build; then
+      echo "  STALE: sources are newer than the served build — ./run_server.sh -r"
+    fi
     exit 1
   fi
-  if [ ! -f client/dist/index.html ] || [ ! -f server/dist/index.js ]; then
-    echo "==> building first (client + server)"
+  if needs_build; then
+    echo "==> sources changed since the last build — rebuilding (client + server)"
     npm run build
   fi
   nohup npm start >"$LOG" 2>&1 &
