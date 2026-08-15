@@ -76,6 +76,7 @@ export class CpuTileTerrain implements TerrainView {
   private noise: CanvasPattern | null = null;
   /** Living scenery trees; blasts prune them, survivors ride the surface. */
   private trees: TerrainTree[] = [];
+  private skirt: Sprite | null = null;
 
   init(
     heights: Float64Array,
@@ -90,6 +91,7 @@ export class CpuTileTerrain implements TerrainView {
     this.theme = theme;
     this.trees = trees ? [...trees] : [];
     this.noise = makeNoisePattern();
+    this.setupSkirt(aprons ? aprons.left.length : 0);
     if (aprons) {
       this.setupApron(aprons.left, 'left');
       this.setupApron(aprons.right, 'right');
@@ -261,6 +263,31 @@ export class CpuTileTerrain implements TerrainView {
   }
 
   /**
+   * Bedrock skirt: solid strata below the world floor, spanning the aprons
+   * too, so the camera may pan past the bottom (deep-valley tanks get lifted
+   * above the bottom HUD) without ever showing void.
+   */
+  private setupSkirt(apronW: number): void {
+    const theme = this.theme;
+    if (!theme) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = 8;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d')!;
+    const g = ctx.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0, cssColor(theme.soilDeep));
+    g.addColorStop(1, cssColor(shade(theme.soilDeep, 0.55)));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 8, 256);
+    const sprite = new Sprite(Texture.from(canvas));
+    sprite.position.set(-apronW, WORLD_H - 1);
+    sprite.width = this.width + apronW * 2;
+    sprite.height = 1000;
+    this.container.addChild(sprite);
+    this.skirt = sprite;
+  }
+
+  /**
    * Decorative hills past the world edge, drawn at half resolution so
    * zoomed-out framing never shows bare sky. arr[0] hugs the edge. The apron
    * tucks APRON_OVERLAP px under the edge tiles (tiles paint on top): abutting
@@ -378,6 +405,12 @@ export class CpuTileTerrain implements TerrainView {
       if (a.texture !== Texture.EMPTY) a.texture.destroy(true);
     }
     this.apronSides = [];
+    if (this.skirt) {
+      const tex = this.skirt.texture;
+      this.skirt.destroy();
+      tex.destroy(true);
+      this.skirt = null;
+    }
   }
 
   destroy(): void {

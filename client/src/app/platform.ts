@@ -24,17 +24,26 @@ export const CAN_FULLSCREEN =
 
 let safeAreaProbe: HTMLDivElement | null = null;
 
-/** Current env(safe-area-inset-right) in px, measured via a hidden probe. */
-function safeAreaInsetRight(): number {
-  if (typeof document === 'undefined' || !document.body) return 0;
+function probe(): CSSStyleDeclaration | null {
+  if (typeof document === 'undefined' || !document.body) return null;
   if (!safeAreaProbe) {
     safeAreaProbe = document.createElement('div');
     safeAreaProbe.style.cssText =
       'position:fixed;top:-1px;left:-1px;width:0;height:0;visibility:hidden;' +
-      'pointer-events:none;padding-right:env(safe-area-inset-right)';
+      'pointer-events:none;padding-right:env(safe-area-inset-right);' +
+      'padding-bottom:env(safe-area-inset-bottom)';
     document.body.appendChild(safeAreaProbe);
   }
-  return parseFloat(getComputedStyle(safeAreaProbe).paddingRight) || 0;
+  return getComputedStyle(safeAreaProbe);
+}
+
+/** Current env(safe-area-inset-right) in px, measured via a hidden probe. */
+function safeAreaInsetRight(): number {
+  return parseFloat(probe()?.paddingRight ?? '') || 0;
+}
+
+function safeAreaInsetBottom(): number {
+  return parseFloat(probe()?.paddingBottom ?? '') || 0;
 }
 
 /**
@@ -46,4 +55,13 @@ function safeAreaInsetRight(): number {
 export function touchHudRightReserve(): number {
   if (!IS_COARSE_POINTER) return 0;
   return Math.max(4, safeAreaInsetRight() / 4) + 72;
+}
+
+/**
+ * Screen px of the bottom HUD band (weapon tray + angle/power readouts) the
+ * camera keeps the lowest tank above, so a unit in a deep valley can never
+ * hide behind the controls.
+ */
+export function hudBottomReserve(): number {
+  return (IS_COARSE_POINTER ? 128 : 150) + safeAreaInsetBottom();
 }

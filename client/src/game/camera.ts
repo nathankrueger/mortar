@@ -20,6 +20,8 @@ const MAX_ZOOM_OUT = 0.5;
 const SKY_BIAS_MAX = 200;
 /** Never crop closer than this below the lowest tank (wu). */
 const FLOOR_PAD = 80;
+/** Furthest the view may pan below the world floor (bedrock skirt depth, wu). */
+const SKIRT_MAX = 900;
 
 /**
  * Resting framing: fit the battlefield width, pin the ground to the bottom
@@ -37,11 +39,12 @@ export class Camera {
   private vh = 1;
   private worldW = WORLD_W;
   private hudInsetR = 0;
+  private hudInsetB = 0;
   private fitScale = 1;
   private scale = 1;
   private cx = WORLD_W / 2;
   private cy = WORLD_H / 2;
-  private floorY = WORLD_H;
+  private floorY = 0;
   private snapped = false;
 
   constructor(private readonly root: Container) {}
@@ -68,6 +71,16 @@ export class Camera {
     if (px === this.hudInsetR) return;
     this.hudInsetR = px;
     this.refit();
+  }
+
+  /**
+   * Screen px along the bottom (weapon tray + readouts) the lowest tank must
+   * clear. When a tank sits deep in a valley the camera pans down past the
+   * world floor — the bedrock skirt fills what shows below — so a unit can
+   * never hide behind the controls.
+   */
+  setBottomInset(px: number): void {
+    this.hudInsetB = px;
   }
 
   /** Viewport width actually available to the battlefield. */
@@ -108,7 +121,13 @@ export class Camera {
       0,
       Math.min(missing, SKY_BIAS_MAX, WORLD_H - (this.floorY + FLOOR_PAD)),
     );
-    const bottomEdge = WORLD_H - bias;
+    let bottomEdge = WORLD_H - bias;
+    // Lift deep-valley tanks above the bottom HUD band, panning into the
+    // bedrock skirt when the world floor alone isn't enough.
+    if (this.hudInsetB > 0 && this.floorY > 0) {
+      const minEdge = this.floorY + (this.hudInsetB + 10) / this.fitScale;
+      bottomEdge = Math.max(bottomEdge, Math.min(minEdge, WORLD_H + SKIRT_MAX));
+    }
 
     let tScale = this.fitScale;
     if (interest) {
