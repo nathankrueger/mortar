@@ -106,10 +106,7 @@ export function HudRoot({
 
       {/* Turn banner */}
       {phase === 'aim' && (
-        <div
-          key={`${turnNumber}-${turnSeat}`}
-          className="turn-banner absolute top-24 left-1/2 -translate-x-1/2"
-        >
+        <div key={`${turnNumber}-${turnSeat}`} className="turn-banner absolute top-24 left-1/2">
           <span
             className={`rounded-full bg-slate-900/50 px-5 py-1.5 text-2xl font-bold tracking-tight backdrop-blur-xl ${SEAT_TEXT[turnSeat]}`}
           >

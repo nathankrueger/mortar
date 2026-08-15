@@ -51,26 +51,34 @@ body {
   height: 100%;
 }
 
+/*
+ * The banner centers itself via its animation transform ONLY — never combine
+ * with a translate-x utility: Tailwind v4's translate utilities set the CSS
+ * `translate` property, which stacks with the keyframes' `transform` and
+ * shoves the pill half its width off-center.
+ */
 @keyframes turn-banner {
   0% {
     opacity: 0;
-    transform: translate(-50%, -8px) scale(0.92);
+    transform: translate(-50%, -10px) scale(0.92);
   }
-  12% {
+  10% {
     opacity: 1;
     transform: translate(-50%, 0) scale(1);
   }
-  75% {
+  60% {
     opacity: 1;
+    transform: translate(-50%, 0) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -4px);
+    transform: translate(-50%, -16px) scale(0.97);
   }
 }
 
 .turn-banner {
-  animation: turn-banner 2s ease-out forwards;
+  transform: translate(-50%, 0);
+  animation: turn-banner 2.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 /* Short screens: drop the flavor text so the shop grid shows more weapons. */
