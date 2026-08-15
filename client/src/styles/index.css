@@ -52,32 +52,31 @@ body {
 }
 
 /*
- * The banner centers itself via its animation transform ONLY — never combine
- * with a translate-x utility: Tailwind v4's translate utilities set the CSS
- * `translate` property, which stacks with the keyframes' `transform` and
- * shoves the pill half its width off-center.
+ * The banner rides the HUD's centered column (with the wind pill), so its
+ * centering is layout, not transform — the animation only moves it
+ * vertically. Never reintroduce a horizontal translate here: it would fight
+ * the flex centering and knock the pill off the shared axis.
  */
 @keyframes turn-banner {
   0% {
     opacity: 0;
-    transform: translate(-50%, -10px) scale(0.92);
+    transform: translateY(-10px) scale(0.92);
   }
   10% {
     opacity: 1;
-    transform: translate(-50%, 0) scale(1);
+    transform: translateY(0) scale(1);
   }
   60% {
     opacity: 1;
-    transform: translate(-50%, 0) scale(1);
+    transform: translateY(0) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -16px) scale(0.97);
+    transform: translateY(-16px) scale(0.97);
   }
 }
 
 .turn-banner {
-  transform: translate(-50%, 0);
   animation: turn-banner 2.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 

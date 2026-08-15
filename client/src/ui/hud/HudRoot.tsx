@@ -88,11 +88,24 @@ export function HudRoot({
             hideCredits={mySeat !== null && mySeat !== 0}
           />
         </div>
+        {/* Center column: the one true centered axis. The viewport center is
+            NOT it — the side groups differ in width and the notch makes the
+            safe-area padding asymmetric — so anything that must line up with
+            the wind pill (turn banner included) lives in here. */}
         <div className="mt-1 flex flex-col items-center gap-2">
           <WindPill wind={wind} />
           {phase === 'resolving' && (
             <div className="rounded-full border border-white/10 bg-slate-900/45 px-3 py-1 text-xs text-white/50 backdrop-blur-xl">
               {WEAPONS[weapon].name} away…
+            </div>
+          )}
+          {phase === 'aim' && (
+            <div key={`${turnNumber}-${turnSeat}`} className="turn-banner">
+              <span
+                className={`rounded-full bg-slate-900/50 px-5 py-1.5 text-2xl font-bold tracking-tight backdrop-blur-xl ${SEAT_TEXT[turnSeat]}`}
+              >
+                {seats[turnSeat].nickname}
+              </span>
             </div>
           )}
         </div>
@@ -103,17 +116,6 @@ export function HudRoot({
           hideCredits={mySeat !== null && mySeat !== 1}
         />
       </div>
-
-      {/* Turn banner */}
-      {phase === 'aim' && (
-        <div key={`${turnNumber}-${turnSeat}`} className="turn-banner absolute top-24 left-1/2">
-          <span
-            className={`rounded-full bg-slate-900/50 px-5 py-1.5 text-2xl font-bold tracking-tight backdrop-blur-xl ${SEAT_TEXT[turnSeat]}`}
-          >
-            {seats[turnSeat].nickname}
-          </span>
-        </div>
-      )}
 
       {/* Bottom: weapons + readouts */}
       {(phase === 'aim' || phase === 'resolving') && (
