@@ -1,5 +1,6 @@
 import {
   cssColor,
+  DEFAULT_CONFIG,
   generateTerrain,
   resolveSeatColors,
   TANK_PALETTE,
@@ -16,7 +17,6 @@ import {
 import { WEAPONS, type WeaponId } from '@mortar/shared';
 import { Application, Container, Sprite, Texture } from 'pixi.js';
 import { touchHudRightReserve } from '../app/platform';
-import { loadTracer } from '../app/settings';
 import { sfx } from '../audio/sfx';
 import { Camera, type InterestBox } from './camera';
 import { ShotPlayback, type PlaybackDelegate } from './playback';
@@ -117,7 +117,8 @@ export class GameApp {
 
     this.app.stage.addChild(this.sky.container, this.worldRoot);
     this.worldRoot.addChild(this.clouds.container);
-    this.tracers.setStrength(loadTracer());
+    // Until a match hands over its config (sandbox/preview), use the default.
+    this.tracers.setStrength(DEFAULT_CONFIG.tracer / 100);
 
     // Full-screen flash quad for The Big One (above the world).
     this.screenFlash = new Sprite(Texture.WHITE);
@@ -188,6 +189,7 @@ export class GameApp {
       { left: gen.apronLeft, right: gen.apronRight },
       gen.trees,
     );
+    this.terrain.onTreeFire = (x, y, h, intensity) => this.fx.treeFire(x, y, h, intensity);
 
     // Rebuild layer order above the clouds.
     this.worldRoot.addChild(
@@ -244,7 +246,7 @@ export class GameApp {
     this.weather.setWind(wind);
   }
 
-  /** Tracer tail strength, 0 (off) … 1 — live from the pause menu slider. */
+  /** Tracer tail strength, 0 (off) … 1 — comes from the room's match config. */
   setTracer(strength: number): void {
     this.tracers.setStrength(strength);
   }
@@ -388,6 +390,7 @@ export class GameApp {
     }
     for (const t of this.tanks.values()) t.update(dt);
     this.tracers.update(dt);
+    this.terrain?.update(dt);
     this.shake.update(dt, this.camera);
     this.camera.update(dt, this.followInterest());
     this.sky.update(dt, this.camera.worldLeft, this.camera.currentScale);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { driftWind, WIND_DRIFT_FRAC } from './config';
+import { DEFAULT_CONFIG, driftWind, resolveConfig, WIND_DRIFT_FRAC } from './config';
 import { mulberry32 } from './rng';
 
 describe('driftWind', () => {
@@ -43,5 +43,25 @@ describe('driftWind', () => {
       return out;
     };
     expect(run()).toEqual(run());
+  });
+});
+
+describe('tracer (room setting)', () => {
+  it('defaults to a visible tail and rides in the match config', () => {
+    expect(DEFAULT_CONFIG.tracer).toBe(50);
+    expect(resolveConfig({ tracer: 0 }).tracer).toBe(0);
+    expect(resolveConfig({ tracer: 100 }).tracer).toBe(100);
+  });
+
+  it('keeps the room\'s other settings when only the tracer is set', () => {
+    const c = resolveConfig({ tracer: 20 });
+    expect(c.worldWidth).toBe(DEFAULT_CONFIG.worldWidth);
+    expect(c.startingCredits).toBe(DEFAULT_CONFIG.startingCredits);
+  });
+
+  it('falls back to defaults for out-of-range or junk values', () => {
+    expect(resolveConfig({ tracer: 999 }).tracer).toBe(DEFAULT_CONFIG.tracer);
+    expect(resolveConfig({ tracer: -5 }).tracer).toBe(DEFAULT_CONFIG.tracer);
+    expect(resolveConfig({ tracer: 'lots' }).tracer).toBe(DEFAULT_CONFIG.tracer);
   });
 });

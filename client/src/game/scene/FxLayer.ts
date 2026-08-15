@@ -232,6 +232,73 @@ export class FxLayer {
     });
   }
 
+  /**
+   * Flames licking up a burning tree — called repeatedly while it burns,
+   * with intensity falling off as the tree is consumed.
+   */
+  treeFire(x: number, groundY: number, h: number, intensity: number): void {
+    const i = Math.max(0.15, Math.min(1, intensity));
+
+    // Flame body: short-lived additive blobs, re-emitted faster than they die
+    // so the tree wears a continuously flickering fire.
+    for (let k = 0; k < 2; k++) {
+      const flame = new Sprite(glowTexture());
+      flame.anchor.set(0.5);
+      flame.blendMode = 'add';
+      const spread = h * 0.22;
+      const fx = x + (Math.random() - 0.5) * spread;
+      const fy = groundY - h * (0.2 + Math.random() * 0.55);
+      flame.position.set(fx, fy);
+      this.container.addChild(flame);
+      const base = (h * (0.5 + Math.random() * 0.45) * (0.55 + i * 0.6)) / flame.texture.width;
+      const dur = 0.22 + Math.random() * 0.2;
+      this.push(
+        dur,
+        (f, dt) => {
+          flame.tint = fireTint(0.15 + f * 0.7);
+          flame.alpha = (0.75 * i) * Math.sin(Math.PI * f);
+          flame.scale.set(base * (0.7 + f * 0.5));
+          flame.y -= (18 + 26 * i) * dt;
+        },
+        () => flame.destroy(),
+      );
+    }
+
+    this.sparks.burst({
+      x: x + (Math.random() - 0.5) * h * 0.45,
+      y: groundY - h * (0.15 + Math.random() * 0.6),
+      count: 2,
+      speed: [14, 46 + 40 * i],
+      angle: [Math.PI * 1.3, Math.PI * 1.7], // upward fan
+      life: [0.22, 0.5],
+      scale: [0.16 + 0.2 * i, 0.02],
+      tints: FIRE_STOPS.slice(0, 4),
+      gravity: -55,
+      drag: 0.6,
+      alpha: 0.85,
+    });
+    if (Math.random() < 0.16) {
+      const puff = new Sprite(glowTexture());
+      puff.anchor.set(0.5);
+      puff.tint = 0x4a443d;
+      puff.alpha = 0;
+      puff.position.set(x + (Math.random() - 0.5) * h * 0.3, groundY - h * 0.7);
+      this.smokeHolder.addChild(puff);
+      const s = (h * 0.5) / puff.texture.width;
+      const dur = 1.4 + Math.random();
+      this.push(
+        dur,
+        (f, dt) => {
+          puff.alpha = 0.3 * Math.sin(Math.PI * f);
+          puff.scale.set(s * (0.5 + f * 1.5));
+          puff.y -= 26 * dt;
+          puff.x += 8 * dt;
+        },
+        () => puff.destroy(),
+      );
+    }
+  }
+
   /** Emit a short-lived trail mote behind a moving shell. */
   trail(x: number, y: number, hot: boolean): void {
     this.sparks.burst({

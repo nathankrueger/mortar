@@ -29,6 +29,8 @@ export interface TerrainView {
     trees?: readonly TerrainTree[],
   ): void;
   applyCarves(circles: readonly CarveCircle[]): void;
+  /** Advances tree fires; cheap no-op when nothing is burning. */
+  update(dtSec: number): void;
   destroy(): void;
 }
 
@@ -46,6 +48,31 @@ interface Tile {
   x0: number;
   y0: number;
   w: number;
+}
+
+/** A blast this far out (times its radius) scorches a tree into flame. */
+const IGNITE_FACTOR = 2.4;
+/** Seconds a tree burns before it's consumed, ± jitter. */
+const BURN_SEC = 7;
+/** Seconds between flame emissions per burning tree. */
+const FLAME_INTERVAL = 0.07;
+
+interface LiveTree extends TerrainTree {
+  /** Seconds of burning left, or null when the tree is not on fire. */
+  burn: number | null;
+  /** Time until the next flame emission. */
+  emit: number;
+  /** Burnt out — drawn as a blackened stump. */
+  charred: boolean;
+}
+
+/** Deterministic 0..1 per column so burn times differ tree to tree. */
+function jitter01(x: number): number {
+  let z = Math.imul((x | 0) + 0x6d2b, 0x85ebca6b);
+  z ^= z >>> 13;
+  z = Math.imul(z, 0xc2b2ae35);
+  z ^= z >>> 16;
+  return (z >>> 0) / 4294967296;
 }
 
 /**
@@ -75,7 +102,13 @@ export class CpuTileTerrain implements TerrainView {
   private theme: TerrainTheme | null = null;
   private noise: CanvasPattern | null = null;
   /** Living scenery trees; blasts prune them, survivors ride the surface. */
-  private trees: TerrainTree[] = [];
+  private trees: LiveTree[] = [];
+  private burningCount = 0;
+  /**
+   * Emitted for each burning tree while it burns — GameApp routes it to the
+   * FX layer's flames. (x, groundY, height, 0..1 intensity.)
+   */
+  onTreeFire: ((x: number, y: number, h: number, intensity: number) => void) | null = null;
 
   init(
     heights: Float64Array,
@@ -88,7 +121,8 @@ export class CpuTileTerrain implements TerrainView {
     this.width = heights.length;
     this.cols = Math.ceil(this.width / TILE_W);
     this.theme = theme;
-    this.trees = trees ? [...trees] : [];
+    this.trees = (trees ?? []).map((t) => ({ ...t, burn: null, emit: 0, charred: false }));
+    this.burningCount = 0;
     this.noise = makeNoisePattern();
     if (aprons) {
       this.setupApron(aprons.left, 'left');
@@ -127,9 +161,21 @@ export class CpuTileTerrain implements TerrainView {
     if (!this.theme) return;
     const dirtyCols = new Set<number>();
     const scorches: CarveCircle[] = [];
-    // Blasts clear the woods around ground zero (mounds just bury trunks).
+    // Blasts clear the woods around ground zero; trees just outside the crater
+    // are scorched rather than felled, and catch fire (mounds just bury trunks).
     for (const c of circles) {
-      if (!c.add) this.trees = this.trees.filter((t) => Math.abs(t.x - c.x) > c.r * 0.9);
+      if (c.add) continue;
+      this.trees = this.trees.filter((t) => Math.abs(t.x - c.x) > c.r * 0.9);
+      for (const t of this.trees) {
+        if (t.charred || t.burn !== null) continue;
+        const base = this.surfaceAt(t.x);
+        const dx = t.x - c.x;
+        const dy = base - t.h * 0.5 - c.y; // aim at the crown, not the roots
+        if (dx * dx + dy * dy > (c.r * IGNITE_FACTOR) ** 2) continue;
+        t.burn = BURN_SEC * (0.7 + jitter01(t.x) * 0.6);
+        t.emit = 0;
+        this.burningCount++;
+      }
     }
     let edgeTouched: { left: boolean; right: boolean } = { left: false, right: false };
     for (const c of circles) {
@@ -163,6 +209,50 @@ export class CpuTileTerrain implements TerrainView {
         for (const c of scorches) this.scorch(tile, c);
         tile.texture.source.update();
       }
+    }
+  }
+
+  private surfaceAt(x: number): number {
+    return this.surfaces[Math.min(this.width - 1, Math.max(0, Math.round(x)))];
+  }
+
+  /**
+   * Advance tree fires: burning trees throw flames until they're consumed,
+   * then become charred stumps (one tile repaint each). No-op — and no
+   * per-frame cost — while nothing is alight.
+   */
+  update(dtSec: number): void {
+    if (this.burningCount === 0) return;
+    const spent: number[] = [];
+    for (const t of this.trees) {
+      if (t.burn === null) continue;
+      t.burn -= dtSec;
+      t.emit -= dtSec;
+      if (t.burn <= 0) {
+        t.burn = null;
+        t.charred = true;
+        this.burningCount--;
+        spent.push(t.x);
+        continue;
+      }
+      if (t.emit <= 0) {
+        t.emit = FLAME_INTERVAL;
+        // Flames flare up, then die down as the tree is consumed.
+        const life = t.burn / BURN_SEC;
+        this.onTreeFire?.(t.x, this.surfaceAt(t.x), t.h, Math.min(1, life * 1.6));
+      }
+    }
+    for (const x of spent) this.repaintColumnAt(x);
+  }
+
+  /** Repaint the tile column containing world x (all rows). */
+  private repaintColumnAt(x: number): void {
+    const col = Math.min(this.cols - 1, Math.max(0, Math.floor(x / TILE_W)));
+    for (let row = 0; row < ROWS; row++) {
+      const tile = this.tiles[row * this.cols + col];
+      if (!tile) continue;
+      this.paintTile(tile);
+      tile.texture.source.update();
     }
   }
 
@@ -230,10 +320,17 @@ export class CpuTileTerrain implements TerrainView {
   }
 
   /** Tiny scenery tree standing on the surface at its column. */
-  private drawTree(ctx: CanvasRenderingContext2D, theme: TerrainTheme, t: TerrainTree): void {
+  private drawTree(ctx: CanvasRenderingContext2D, theme: TerrainTheme, t: LiveTree): void {
     const xi = Math.min(this.width - 1, Math.max(0, Math.round(t.x)));
     const base = this.surfaces[xi] + 2;
     const h = t.h;
+    if (t.charred) {
+      // Burnt out: a blackened snag where the tree stood.
+      ctx.fillStyle = '#2a2119';
+      ctx.fillRect(t.x - 1.1, base - h * 0.3, 2.2, h * 0.3);
+      ctx.fillRect(t.x - h * 0.09, base - h * 0.3, h * 0.18, 1.6);
+      return;
+    }
     ctx.fillStyle = cssColor(shade(theme.soilDeep, 0.72));
     ctx.fillRect(t.x - 1.1, base - h * 0.4, 2.2, h * 0.4);
     ctx.fillStyle = cssColor(shade(theme.grass, t.kind === 1 ? 0.52 : 0.64));

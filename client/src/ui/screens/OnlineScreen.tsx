@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION, type ColorPick, type ServerMsg } from '@mortar/shared';
+import { DEFAULT_CONFIG, PROTOCOL_VERSION, type ColorPick, type ServerMsg } from '@mortar/shared';
 import QRCode from 'qrcode';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { navigate } from '../../app/routes';
@@ -21,7 +21,7 @@ import { ColorPicker } from '../kit/ColorPicker';
 import { GlassPanel } from '../kit/GlassPanel';
 import { Segmented } from '../kit/Segmented';
 import { HudRoot } from '../hud/HudRoot';
-import { FUNDS_OPTIONS, WIDTH_OPTIONS } from './SoloScreen';
+import { FUNDS_OPTIONS, TracerSlider, WIDTH_OPTIONS } from './SoloScreen';
 
 type Stage = 'form' | 'connecting' | 'lobby' | 'game';
 export type OnlineMode = 'create' | 'join' | 'rejoin';
@@ -48,6 +48,7 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
   const [codeDraft, setCodeDraft] = useState(initialCode ?? '');
   const [worldWidth, setWorldWidth] = useState(2400);
   const [startingCredits, setStartingCredits] = useState(10_000);
+  const [tracer, setTracer] = useState(DEFAULT_CONFIG.tracer);
   const [error, setError] = useState<string | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
@@ -252,7 +253,7 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
           v: PROTOCOL_VERSION,
           nickname: nick,
           color,
-          config: { worldWidth, startingCredits },
+          config: { worldWidth, startingCredits, tracer },
         });
       } else if (mode === 'join') {
         ws.send({
@@ -269,7 +270,7 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
       setError((e as Error).message);
       setStage('form');
     }
-  }, [mode, nickname, color, codeDraft, attach, worldWidth, startingCredits]);
+  }, [mode, nickname, color, codeDraft, attach, worldWidth, startingCredits, tracer]);
 
   // Rejoin mode connects immediately.
   useEffect(() => {
@@ -353,6 +354,7 @@ export function OnlineScreen({ mode, initialCode }: { mode: OnlineMode; initialC
                   value={startingCredits}
                   onChange={setStartingCredits}
                 />
+                <TracerSlider value={tracer} onChange={setTracer} />
               </>
             )}
             {mode === 'join' && (

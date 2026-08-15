@@ -1,4 +1,10 @@
-import { AI_PROFILES, type AiDifficulty, type ColorPick, type MatchConfig } from '@mortar/shared';
+import {
+  AI_PROFILES,
+  DEFAULT_CONFIG,
+  type AiDifficulty,
+  type ColorPick,
+  type MatchConfig,
+} from '@mortar/shared';
 import { useState } from 'react';
 import { navigate } from '../../app/routes';
 import { saveColorPick, savedColorPick } from '../../session/rejoinStorage';
@@ -28,14 +34,40 @@ export const FUNDS_OPTIONS = [
   { label: '50k', value: 50_000 },
 ];
 
+/** Room-wide shot-tracer length. Shared by the solo and create-room forms. */
+export function TracerSlider({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="flex justify-between text-xs font-semibold text-white/55 uppercase">
+        Shot tracer <span>{value === 0 ? 'Off' : `${value}%`}</span>
+      </span>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="accent-white"
+      />
+    </label>
+  );
+}
+
 export function SoloScreen() {
   const [difficulty, setDifficulty] = useState<AiDifficulty | null>(null);
   const [worldWidth, setWorldWidth] = useState(2400);
   const [startingCredits, setStartingCredits] = useState(10_000);
+  const [tracer, setTracer] = useState(DEFAULT_CONFIG.tracer);
   const [color, setColor] = useState<ColorPick>(() => savedColorPick());
 
   if (difficulty) {
-    const config: Partial<MatchConfig> = { worldWidth, startingCredits };
+    const config: Partial<MatchConfig> = { worldWidth, startingCredits, tracer };
     return (
       <HotseatScreen
         key={difficulty}
@@ -57,6 +89,7 @@ export function SoloScreen() {
           value={startingCredits}
           onChange={setStartingCredits}
         />
+        <TracerSlider value={tracer} onChange={setTracer} />
         <ColorPicker
           value={color}
           onChange={(c) => {

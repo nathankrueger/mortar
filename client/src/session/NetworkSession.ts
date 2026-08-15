@@ -172,6 +172,7 @@ export class NetworkSession implements GameSession {
       this.pushStore();
     };
     this.game.setColorPicks(msg.colors);
+    this.game.setTracer(msg.config.tracer / 100);
     this.game.loadRound(msg.matchSeed, msg.config.worldWidth);
   }
 
@@ -217,6 +218,7 @@ export class NetworkSession implements GameSession {
       }
     };
     this.game.setColorPicks(msg.colors);
+    this.game.setTracer(msg.config.tracer / 100);
     this.game.loadRound(msg.matchSeed, msg.config.worldWidth);
   }
 

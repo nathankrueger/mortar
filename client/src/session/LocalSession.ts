@@ -127,6 +127,7 @@ export class LocalSession implements GameSession {
       }
     };
     game.setColorPicks(this.options.colorPicks ?? [null, null]);
+    game.setTracer(this.config.tracer / 100);
     game.loadRound(this.matchSeed, this.config.worldWidth);
   }
 

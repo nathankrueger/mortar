@@ -14,6 +14,11 @@ export const MatchConfigSchema = z.object({
   /** Seconds per turn (aiming + shopping). 0 disables the timer. */
   turnSeconds: z.number().int().min(0).max(600).default(60),
   windMax: z.number().int().min(0).max(300).default(WIND_MAX_DEFAULT),
+  /**
+   * Shot-tracer tail length, 0 (off) … 100. A room setting, not a per-browser
+   * one: everyone in a match sees the same battlefield.
+   */
+  tracer: z.number().int().min(0).max(100).default(50),
 });
 
 export type MatchConfig = z.infer<typeof MatchConfigSchema>;
