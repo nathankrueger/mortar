@@ -41,6 +41,8 @@ export class Camera {
   private scale = 1;
   private cx = WORLD_W / 2;
   private cy = WORLD_H / 2;
+  /** Smoothed world y shown at the screen's bottom edge; cy derives from it. */
+  private bottomSmooth = WORLD_H;
   private floorY = WORLD_H;
   private snapped = false;
 
@@ -120,14 +122,12 @@ export class Camera {
         Math.min(this.fitScale, this.vh / (bottomEdge - neededTop)),
       );
     }
-    const span = this.vh / tScale;
     const tcx = this.worldW / 2;
-    const tcy = bottomEdge - span / 2;
 
     if (!this.snapped) {
       this.scale = tScale;
       this.cx = tcx;
-      this.cy = tcy;
+      this.bottomSmooth = bottomEdge;
       this.snapped = true;
     } else {
       const a = 1 - Math.exp(-dtSec * SMOOTHING);
@@ -136,8 +136,13 @@ export class Camera {
       const aScale = 1 - Math.exp(-dtSec * (tScale < this.scale ? 16 : 3));
       this.scale += (tScale - this.scale) * aScale;
       this.cx += (tcx - this.cx) * a;
-      this.cy += (tcy - this.cy) * a;
+      this.bottomSmooth += (bottomEdge - this.bottomSmooth) * a;
     }
+    // cy is DERIVED from the smoothed bottom edge and the live scale, never
+    // lerped on its own: scale zooms much faster than a position lerp, and
+    // the mismatch let the view slip below the world floor for a few frames —
+    // a pale line of sky along the bottom of the screen.
+    this.cy = this.bottomSmooth - this.vh / this.scale / 2;
 
     this.root.pivot.set(this.cx, this.cy);
     this.root.position.set(this.screenCX + this.shakeX, this.vh / 2 + this.shakeY);

@@ -103,6 +103,7 @@ export class CpuTileTerrain implements TerrainView {
   private noise: CanvasPattern | null = null;
   /** Living scenery trees; blasts prune them, survivors ride the surface. */
   private trees: LiveTree[] = [];
+  private skirt: Sprite | null = null;
   private burningCount = 0;
   /**
    * Emitted for each burning tree while it burns — GameApp routes it to the
@@ -124,6 +125,7 @@ export class CpuTileTerrain implements TerrainView {
     this.trees = (trees ?? []).map((t) => ({ ...t, burn: null, emit: 0, charred: false }));
     this.burningCount = 0;
     this.noise = makeNoisePattern();
+    this.setupSkirt(aprons ? aprons.left.length : 0);
     if (aprons) {
       this.setupApron(aprons.left, 'left');
       this.setupApron(aprons.right, 'right');
@@ -365,6 +367,32 @@ export class CpuTileTerrain implements TerrainView {
    * Kept repaintable: edge carves re-anchor the inner columns (blendApron)
    * and redraw so the scenery flows out of craters instead of walling up.
    */
+  /**
+   * Bedrock strip below the world floor (spanning the aprons too): camera
+   * transients — zoom-out easing, screen shake — can show a few pixels past
+   * the bottom, and without this the screen-space sky gradient bleeds through
+   * as a pale line along the bottom of the frame.
+   */
+  private setupSkirt(apronW: number): void {
+    const theme = this.theme;
+    if (!theme) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = 8;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d')!;
+    const g = ctx.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0, cssColor(theme.soilDeep));
+    g.addColorStop(1, cssColor(shade(theme.soilDeep, 0.55)));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 8, 256);
+    const sprite = new Sprite(Texture.from(canvas));
+    sprite.position.set(-apronW, WORLD_H - 1); // 1px overlap: no seam at the join
+    sprite.width = this.width + apronW * 2;
+    sprite.height = 600;
+    this.container.addChild(sprite);
+    this.skirt = sprite;
+  }
+
   private setupApron(arr: Float64Array, side: 'left' | 'right'): void {
     if (arr.length === 0) return;
     const cw = Math.ceil(arr.length / 2) + APRON_OVERLAP / 2;
@@ -475,6 +503,12 @@ export class CpuTileTerrain implements TerrainView {
       if (a.texture !== Texture.EMPTY) a.texture.destroy(true);
     }
     this.apronSides = [];
+    if (this.skirt) {
+      const tex = this.skirt.texture;
+      this.skirt.destroy();
+      tex.destroy(true);
+      this.skirt = null;
+    }
   }
 
   destroy(): void {
